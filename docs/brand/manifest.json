@@ -1,0 +1,27 @@
+{
+  "source": "User-supplied project artwork sheet, 2026-10-23",
+  "source_dimensions": [
+    1536,
+    1024
+  ],
+  "coordinate_convention": "left, top, right-exclusive, bottom-exclusive",
+  "project": {
+    "label": "NagoyAction",
+    "icon": [
+      335,
+      350,
+      504,
+      519
+    ],
+    "favicon": [
+      514,
+      437,
+      583,
+      506
+    ],
+    "icon_sha256": "78fbc688efdb95ed3eddf4c8b868f891f2f7a20bfef6484062d65298e72f9e1e",
+    "icon_rgb_sha256": "c7ceec70f40945e6c199a23fff0a2d9eaa1fcc52f65b77779d5d8b22553cbeae",
+    "favicon_sha256": "4ffbbe7ae9f63459d6c31422f4c048be69ccf8084a7dd1189d179d248f6d6074",
+    "favicon_rgb_sha256": "359e7324a55fbaef0b0f93920db9c2e59de82127bf666d2d7b65710ac94d592b"
+  }
+}
