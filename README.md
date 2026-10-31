@@ -155,7 +155,7 @@ git -C ../Aoi add -A nagoyaction
 cd ../Aoi && uv run --locked pytest -q -c pyproject.toml nagoyaction/tests
 ```
 
-CI does the same on Python 3.11–3.15.
+CI does the same on Python 3.11–3.15. Python is provisioned with `astral-sh/setup-uv` (not `actions/setup-python`); fixed lanes run on 3.15, the matrix keeps the compatibility range.
 
 ## Relationship with Aoi
 
