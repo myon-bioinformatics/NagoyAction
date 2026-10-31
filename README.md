@@ -209,6 +209,11 @@ set `PY_LAUNCH_ERROR_FORMAT=json` for a structured launcher error on stderr (ind
 the tool's `--json` flag).
 
 The launcher and license are pinned to Aoi's accepting main merge commit
-[`bb5eb56`](https://github.com/myon-bioinformatics/Aoi/commit/bb5eb56f216eeff9135b7aa178197a79df152396),
-not to the root repository or an unmerged PR head. `shared-tools.lock.json` remains the separate,
-unchanged lock for the polars shrink tools under `vendor/aoi/`.
+[`70c08f2`](https://github.com/myon-bioinformatics/Aoi/commit/70c08f29c2142f78aad63507f2d09915d6909e21),
+not to the root repository or an unmerged PR head. `shared-tools.lock.json` remains the separate
+lock for the polars shrink tools under `vendor/aoi/`.
+
+The shared launcher also supports direct use:
+`node vendor/py_launch.cjs [--env-var NAME] [--site] [--] SCRIPT.py [ARGS...]`.
+Direct use defaults to `-S`; `--site` explicitly enables site-packages. The existing
+`nagoyaction.cjs` entry still always requests `noSite: true`.
