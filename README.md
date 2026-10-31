@@ -99,7 +99,7 @@ python localci.py resolve                     # only resolve SHAs; CI's resolve 
 Checks that pass with fixed values are switched to other values from that round's seed with `substitute(name, value, draw)`. In pytest, `-p localci_pytest` does the same via monkeypatch. Rounds can also be chosen with the plugin alone.
 
 ```bash
-pytest -p localci_pytest --localci-repeat 10 --localci-round 3 --localci-seed 7
+uv run --with pytest pytest -p localci_pytest --localci-repeat 10 --localci-round 3 --localci-seed 7
 ```
 
 The references resolved are Aoi, `myon-bioinformatics/myon-bioinformatics`, the vendored `markdown` and `web-ui`, and the repositories listed in the repository root's `vendor.lock.json`. SHAs are not written in source. The GitHub Actions resolve job calls `python localci.py resolve --github-output` and passes the job output `sha` (Aoi) to checkout. Reusable workflow `uses:` can't be expressions, so they stay as pins in the file and localci compares them with the latest release.
