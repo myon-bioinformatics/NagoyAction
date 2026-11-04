@@ -88,6 +88,7 @@ def check_local(root: Path, files: list[str]) -> list[dict]:
     dirs = {posixpath.dirname(f) for f in files}
     dirs |= {d for f in files for d in _parents(f)}
     results = []
+    case_index = None
     for md in sorted(f for f in files if f.lower().endswith(".md")):
         for target in links_in((root / md).read_text(encoding="utf-8")):
             kind = classify(target)
@@ -99,8 +100,12 @@ def check_local(root: Path, files: list[str]) -> list[dict]:
                 elif path == "" or path in tracked or path in dirs:
                     r.update(status="ok", path=path)
                 else:
-                    near = [f for f in tracked | dirs if f.lower() == path.lower()]
-                    reason = f"大文字小文字が違う（実際は {near[0]}）" if near else "git に登録されたファイルがない"
+                    if case_index is None:
+                        case_index = {}
+                        for candidate in tracked | dirs:
+                            case_index.setdefault(candidate.lower(), candidate)
+                    near = case_index.get(path.lower())
+                    reason = f"大文字小文字が違う（実際は {near}）" if near is not None else "git に登録されたファイルがない"
                     r.update(status="broken", path=path, reason=reason)
             else:
                 r["status"] = "not-checked"
