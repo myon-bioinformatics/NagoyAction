@@ -25,7 +25,8 @@ def main():
                 start=time.perf_counter_ns()
                 got=fn(root,files)
                 elapsed=time.perf_counter_ns()-start
-                assert got==expected
+                if got != expected:
+                    raise SystemExit("link report mismatch")
                 if repeat:samples[name].append(elapsed)
     print(json.dumps({'baseline_sha':sha,'files':2001,'links':500,'samples_ns':samples,
                      'median_ns':{k:statistics.median(v) for k,v in samples.items()}},indent=2))
