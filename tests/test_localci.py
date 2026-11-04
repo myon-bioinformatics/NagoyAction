@@ -721,6 +721,28 @@ def test_workflow_delegates_resolution_and_follows_parent_uses_style():
     assert upload == ["cf430e030ddbb5b0abf93d22962f4752f3646cd9"]
 
 
+
+def test_polars_comparison_keeps_real_oracle_without_unused_dependencies():
+    text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    job = _workflow_job(text, "polars-min")
+    real_phase = job.split("      - name: Remove project and dependency groups", 1)[0]
+    for package in ("numpy", "httpx", "coverage", "selectolax", "markdown"):
+        assert f"--no-install-package {package}" in real_phase
+    assert "--no-install-package polars" not in real_phase
+    assert "uv sync --locked --python 3.15" in real_phase
+    # Neither command may silently reinstall the full default groups.
+    assert "uv run --locked --no-sync --python 3.15 pytest -q -c pyproject.toml nagoyaction/tests/test_vendor_aoi.py" in real_phase
+    assert 'uv run --locked --no-sync --python 3.15 python nagoyaction/scripts/collect_with_polars_min.py --deps real "$GITHUB_WORKSPACE/reference.json"' in real_phase
+    assert "uv sync --locked --no-default-groups --no-install-project --python 3.15" in job
+    assert "if .venv/bin/python -c 'import polars'; then" in job
+    assert '.venv/bin/python nagoyaction/scripts/collect_with_polars_min.py --deps min "$GITHUB_WORKSPACE/minimal.json"' in job
+    assert 'cmp "$GITHUB_WORKSPACE/reference.json" "$GITHUB_WORKSPACE/minimal.json"' in job
+    # Only the existing comparison lane is narrowed; the full matrix stays full.
+    full = _workflow_job(text, "test")
+    assert '--no-install-package' not in full
+    assert 'pytest -q -c pyproject.toml nagoyaction/tests --junitxml=' in full
+
+
 def test_dependabot_matches_the_parent_github_actions_schedule():
     text = (ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8")
     assert text == (

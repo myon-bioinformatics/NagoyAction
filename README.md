@@ -157,6 +157,8 @@ cd ../Aoi && uv run --locked pytest -q -c pyproject.toml nagoyaction/tests
 
 CI does the same on Python 3.11–3.15. Python is provisioned with `astral-sh/setup-uv` (not `actions/setup-python`); fixed lanes run on 3.15, the matrix keeps the compatibility range.
 
+The existing real/minimal Polars comparison job uses a [smaller locked environment](docs/polars-min-ci-environment.md), while retaining the real baseline and byte-comparison gates. The full matrix above is unchanged.
+
 ## Relationship with Aoi
 
 A repository split out from [Aoi](https://github.com/myon-bioinformatics/Aoi)'s [`nagoyaction/`](https://github.com/myon-bioinformatics/Aoi/tree/main/nagoyaction). Its direct parent is Aoi, and differences from `nagoyaction/` are checked on the Aoi side.
