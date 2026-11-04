@@ -246,15 +246,19 @@ jobs:
       - name: Vendored polars_min equivalence, then record real collect
         working-directory: .test-deps/aoi
         run: |
-          uv sync --locked --python 3.15
+          # Keep Aoi's lock and pytest plugins, but omit five unused direct packages.
+          uv sync --locked --python 3.15 \
+            --no-install-package numpy --no-install-package httpx \
+            --no-install-package coverage --no-install-package selectolax \
+            --no-install-package markdown
           test -f nagoyaction/vendor/aoi/shrink/polars_min.py
           test -f nagoyaction/vendor/aoi/scripts/shrink_module.py
           test -f nagoyaction/vendor/aoi/scripts/shrink_polars.py
-          uv run --locked --python 3.15 pytest -q -c pyproject.toml nagoyaction/tests/test_vendor_aoi.py
-          uv run --locked --python 3.15 python nagoyaction/scripts/collect_with_polars_min.py --deps real "$GITHUB_WORKSPACE/reference.json"
-      - name: Reinstall locked runtime deps except polars and its compiled runtime
+          uv run --locked --no-sync --python 3.15 pytest -q -c pyproject.toml nagoyaction/tests/test_vendor_aoi.py
+          uv run --locked --no-sync --python 3.15 python nagoyaction/scripts/collect_with_polars_min.py --deps real "$GITHUB_WORKSPACE/reference.json"
+      - name: Remove project and dependency groups for the stdlib-only collect
         working-directory: .test-deps/aoi
-        run: uv sync --locked --no-dev --no-install-package polars --no-install-package polars-runtime-32 --python 3.15
+        run: uv sync --locked --no-default-groups --no-install-project --python 3.15
       - name: polars is not installed
         working-directory: .test-deps/aoi
         run: |
