@@ -677,14 +677,14 @@ def _workflow_job(text: str, name: str) -> str:
 
 def test_workflow_delegates_resolution_and_follows_parent_uses_style():
     text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    resolve = _workflow_job(text, "resolve-aoi")
+    resolve = _workflow_job(text, "resolve-vendor")
     assert "python localci.py resolve --github-output" in resolve
     assert "sha: ${{ steps.resolve.outputs.sha }}" in resolve
     assert "AOI_REPOSITORY_ID" not in resolve
     assert "AOI_REPOSITORY_ID" in _workflow_job(text, "vendor-aoi")
     polars = _workflow_job(text, "polars-min")
     assert 'test "$(git -C .test-deps/aoi rev-parse HEAD)" = "$AOI_SHA"' in polars
-    assert "needs.resolve-aoi.outputs.sha" in polars
+    assert "needs.resolve-vendor.outputs.sha" in polars
     assert "nagoyaction/vendor/aoi/shrink/polars_min.py" in polars
     assert "nagoyaction/vendor/aoi/scripts/shrink_module.py" in polars
     assert "nagoyaction/vendor/aoi/scripts/shrink_polars.py" in polars
@@ -699,7 +699,7 @@ def test_workflow_delegates_resolution_and_follows_parent_uses_style():
     assert "timeout-minutes: 40" in text
     assert "--self-tests" not in text
     assert "--pytest tests/test_localci.py" not in text
-    pinned = "".join(_workflow_job(text, name) for name in ("resolve-aoi", "vendor-aoi", "test", "polars-min", "local-ci"))
+    pinned = "".join(_workflow_job(text, name) for name in ("resolve-vendor", "vendor-aoi", "test", "polars-min", "local-ci"))
     uses = localci.parse_uses(text)
     assert uses
     for item in uses:
