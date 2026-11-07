@@ -83,7 +83,7 @@ SOURCES = (
     Source("aoi", "AOI_SHA", "myon-bioinformatics/Aoi", 1402862784),
     Source("myon_bioinformatics", "MYON_BIOINFORMATICS_SHA", "myon-bioinformatics/myon-bioinformatics", 638801160),
     Source("markdown", "MARKDOWN_SHA", "myon-bioinformatics/markdown", 1374546518),
-    Source("web_ui", "WEB_UI_SHA", "myon-bioinformatics/web-ui", 1382466695),
+    Source("web_ui", "WEB_UI_SHA", "myon-bioinformatics/PySaiyanWeBoo", 1382466695),
 )
 
 _OS = {"Linux": "linux", "Darwin": "darwin", "Windows": "windows"}
