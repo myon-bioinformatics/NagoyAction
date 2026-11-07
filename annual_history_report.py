@@ -98,7 +98,7 @@ def summary(observations,audit_file,annual_file,experiment_files,cache_manifest,
                 interpretation='Synthetic success counts are model-conditional consistency checks, not additional observed NPB samples or a causal verdict about Chunichi.')
 
 
-def main():
+def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--observations',type=Path,required=True)
     p.add_argument('--audit',type=Path,required=True)
@@ -107,7 +107,7 @@ def main():
     p.add_argument('--experiment',type=Path,action='append',required=True)
     p.add_argument('--cache-manifest',type=Path,required=True)
     p.add_argument('--out',type=Path,required=True)
-    a=p.parse_args()
+    a=p.parse_args(argv)
     result=summary(a.observations,a.audit,a.annual,a.experiment,a.cache_manifest,a.baseline)
     a.out.parent.mkdir(parents=True,exist_ok=True)
     a.out.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
