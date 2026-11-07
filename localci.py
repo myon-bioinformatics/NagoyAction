@@ -37,23 +37,8 @@ actionlint の版もソースに固定しない。実行のたびに最新リリ
 
 from __future__ import annotations
 
-import argparse
-import hashlib
-import io
-import json
-import os
-import random
-import re
-import shutil
-import subprocess
-import sys
-import tarfile
-import tempfile
-import urllib.error
-import urllib.request
-import zipfile
-from dataclasses import dataclass
-from pathlib import Path
+import argparse, hashlib, io, json, os, random, re, shutil, subprocess, sys, tarfile, tempfile, urllib.error, urllib.request, zipfile
+from dataclasses import dataclass; from pathlib import Path
 
 
 class LocalCIError(Exception):

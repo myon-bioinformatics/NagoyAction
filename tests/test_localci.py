@@ -1,14 +1,6 @@
 """SHA 解決、uses: のピン、シャード、seed 付き入力の差し替え。ネットワークはモックする。"""
 
-import hashlib
-import io
-import json
-import os
-import random
-import subprocess
-import sys
-import tarfile
-import urllib.error
+import hashlib, io, json, os, random, subprocess, sys, tarfile, urllib.error
 from pathlib import Path
 
 import pytest

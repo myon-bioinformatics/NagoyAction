@@ -1,7 +1,5 @@
-import hashlib
-import json
+import hashlib, json, shutil
 from pathlib import Path
-import shutil
 
 import pytest
 from annual_history_report import audit_files, require_primary_years, summary
