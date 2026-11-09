@@ -204,11 +204,11 @@ python nagoyaction/nagoyaction.py run    cycles/c001-chunichi/pipeline.toml --dr
 
 ## Node entry (Node 26+)
 
-`node nagoyaction.cjs <args>` runs `nagoyaction.py` through the vendored shared launcher
-`vendor/py_launch.cjs`, taken byte-identical from Aoi's `vendor/py_launch.cjs` (parent → Aoi → NagoyAction; no generation is skipped) together with Aoi's `LICENSE` as `vendor/aoi-LICENSE`, both pinned to one Aoi main merge commit in `vendor.lock.json`. Arguments, stdin/stdout/stderr and the
+`node vendor/py_launch.cjs --env-var NAGOYACTION_PYTHON -- nagoyaction.py <args>` runs `nagoyaction.py`
+through the vendored shared launcher `vendor/py_launch.cjs` (there is no per-tool `.cjs` wrapper), taken byte-identical from Aoi's `vendor/py_launch.cjs` (parent → Aoi → NagoyAction; no generation is skipped) together with Aoi's `LICENSE` as `vendor/aoi-LICENSE`, both pinned to one Aoi main merge commit in `vendor.lock.json`. Arguments, stdin/stdout/stderr and the
 exit code are passed through unchanged; Python runs with `-S`, including interpreter discovery.
-Set `NAGOYACTION_PYTHON` to pick the interpreter. The launcher forwards repeated SIGINT/SIGTERM
-until the Python child exits. Launcher failures (no Python 3.9+, spawn error, signal) exit 2;
+`NAGOYACTION_PYTHON` picks the interpreter (via `--env-var`). The launcher forwards repeated SIGINT/SIGTERM
+until the Python child exits. Launcher failures (no Python 3.9+, spawn error, signal) exit 2, as does a Node older than 26;
 set `PY_LAUNCH_ERROR_FORMAT=json` for a structured launcher error on stderr (independent of
 the tool's `--json` flag).
 
@@ -217,7 +217,5 @@ The launcher and license are pinned to Aoi's accepting main merge commit
 not to the root repository or an unmerged PR head. `shared-tools.lock.json` remains the separate
 lock for the polars shrink tools under `vendor/aoi/`.
 
-The shared launcher also supports direct use:
-`node vendor/py_launch.cjs [--env-var NAME] [--site] [--] SCRIPT.py [ARGS...]`.
-Direct use defaults to `-S`; `--site` explicitly enables site-packages. The existing
-`nagoyaction.cjs` entry still always requests `noSite: true`.
+The launcher's CLI is `node vendor/py_launch.cjs [--env-var NAME] [--site] [--] SCRIPT.py [ARGS...]`.
+It defaults to `-S`; `--site` explicitly enables site-packages, which this tool does not need.

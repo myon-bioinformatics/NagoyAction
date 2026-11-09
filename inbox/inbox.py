@@ -6,18 +6,8 @@ orchestration are intentionally deferred from this initial main rollout.
 """
 from __future__ import annotations
 
-import argparse
-import hashlib
-import http.client
-import json
-import os
-import re
-import subprocess
-import sys
-import urllib.error
-import urllib.request
-from dataclasses import asdict
-from pathlib import Path
+import argparse, hashlib, http.client, json, os, re, subprocess, sys, urllib.error, urllib.request
+from dataclasses import asdict; from pathlib import Path
 
 # Dispatch before importing the question reader. The intake implementation and
 # its configuration remain independent of research enablement.

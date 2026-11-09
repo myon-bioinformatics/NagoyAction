@@ -1,14 +1,6 @@
 """SHA 解決、uses: のピン、シャード、seed 付き入力の差し替え。ネットワークはモックする。"""
 
-import hashlib
-import io
-import json
-import os
-import random
-import subprocess
-import sys
-import tarfile
-import urllib.error
+import hashlib, io, json, os, random, subprocess, sys, tarfile, urllib.error
 from pathlib import Path
 
 import pytest
@@ -1090,3 +1082,25 @@ def test_round_seed_is_applied_per_node(tmp_path):
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == expected("test_nodes.py::test_a")
     assert (tmp_path / "b.txt").read_text(encoding="utf-8") == expected("test_nodes.py::test_b")
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") != (tmp_path / "b.txt").read_text(encoding="utf-8")
+
+
+
+def test_web_ui_source_uses_canonical_name_and_preserves_identity():
+    source = next(s for s in localci.SOURCES if s.key == "web_ui")
+    assert source.env == "WEB_UI_SHA"
+    assert source.repo == "myon-bioinformatics/PySaiyanWeBoo"
+    assert source.repository_id == 1382466695
+    api = f"https://api.github.com/repos/{source.repo}"
+    data = {"id": 1382466695, "full_name": source.repo, "visibility": "public", "private": False}
+    calls = []
+    def runner(argv, **kwargs):
+        calls.append(argv)
+        return Proc(stdout=listing(argv[-1], SHA_C))
+    result = localci.resolve_source(source, opener=Opener({api: data}), runner=runner)
+    assert result.sha == SHA_C and result.repository_id == 1382466695
+    assert any(source.repo in arg for arg in calls[0])
+    for change in ({"id": 1}, {"full_name": "myon-bioinformatics/web-ui"},
+                   {"private": True}, {"visibility": "private"}):
+        with pytest.raises(localci.LocalCIError):
+            localci.resolve_source(source, opener=Opener({api: {**data, **change}}),
+                                   runner=lambda *a, **k: pytest.fail("must reject before git"))
