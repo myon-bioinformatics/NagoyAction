@@ -1,11 +1,7 @@
 """Join real annual audit and explicitly separate synthetic model-check evidence."""
 from __future__ import annotations
-import argparse
-from collections import Counter, defaultdict
-import hashlib
-import json
-from pathlib import Path
-import sys
+import argparse, hashlib, json, sys
+from collections import Counter, defaultdict; from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "sakanalytics"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "queryu"))
 # NPB の年間ページの範囲（annual_scope.py）と年間表の前提（aoi_npb.py）は Aoi の直下に置く

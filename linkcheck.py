@@ -28,14 +28,7 @@ gh api が 404 以外で失敗したときも remote=unverified で、リンク�
 
 from __future__ import annotations
 
-import argparse
-import json
-import posixpath
-import re
-import subprocess
-import sys
-import urllib.error
-import urllib.request
+import argparse, json, posixpath, re, subprocess, sys, urllib.error, urllib.request
 from pathlib import Path
 
 LINK = re.compile(r"!?\[(?:[^\]\\]|\\.)*\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")

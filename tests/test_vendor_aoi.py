@@ -5,13 +5,8 @@ tools research_digest.collect uses, not the numpy or fetch_module tools.
 """
 from __future__ import annotations
 
-import ast
-import importlib.util
-import json
-import subprocess
-import sys
-from collections import Counter
-from pathlib import Path
+import ast, importlib.util, json, subprocess, sys
+from collections import Counter; from pathlib import Path
 
 import pytest
 
