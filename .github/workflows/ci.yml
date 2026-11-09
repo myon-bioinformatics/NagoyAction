@@ -40,7 +40,10 @@ jobs:
           version: "latest"
           python-version: "3.11"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: Resolve referenced repositories
         id: resolve
         env:
@@ -66,9 +69,12 @@ jobs:
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "latest"
-          enable-cache: false
           python-version: "3.15"
           activate-environment: true
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/Aoi
@@ -142,9 +148,12 @@ jobs:
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "latest"
-          enable-cache: false
           python-version: "${{ matrix.python }}"
           activate-environment: true
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/Aoi
@@ -218,8 +227,11 @@ jobs:
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "latest"
-          enable-cache: false
           python-version: "3.15"
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/Aoi
@@ -306,9 +318,12 @@ jobs:
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "latest"
-          enable-cache: false
           python-version: "3.11"
           activate-environment: true
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: Run local CI
         env:
           GITHUB_TOKEN: ${{ github.token }}
