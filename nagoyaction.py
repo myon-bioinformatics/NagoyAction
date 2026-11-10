@@ -41,13 +41,7 @@ GitHub Actions のワークフローは `python nagoyaction/nagoyaction.py run <
 
 from __future__ import annotations
 
-import argparse
-import datetime as dt
-import json
-import shutil
-import subprocess
-import sys
-import tomllib
+import argparse, datetime as dt, json, shutil, subprocess, sys, tomllib
 from pathlib import Path
 
 

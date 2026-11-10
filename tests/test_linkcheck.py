@@ -1,11 +1,5 @@
-import json
-import os
-import subprocess
-import sys
-import threading
-import urllib.error
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import json, os, subprocess, sys, threading, urllib.error
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer; from pathlib import Path
 
 import pytest
 

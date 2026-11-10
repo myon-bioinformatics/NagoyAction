@@ -20,7 +20,7 @@ jobs:
       contents: read
     uses: myon-bioinformatics/myon-bioinformatics/.github/workflows/reusable-change-detection.yml@9e3da7ae1846e9604ebc24bb5178f7de094a4e77
 
-  resolve-aoi:
+  resolve-vendor:
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -40,7 +40,10 @@ jobs:
           version: "latest"
           python-version: "3.11"
           activate-environment: true
-          enable-cache: false
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: Resolve referenced repositories
         id: resolve
         env:
@@ -56,7 +59,7 @@ jobs:
   # pull request では不一致を警告にし、main への push と schedule では失敗にする。
   vendor-aoi:
     name: Aoi vendor hashes
-    needs: [changes, resolve-aoi]
+    needs: [changes, resolve-vendor]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -66,18 +69,21 @@ jobs:
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "latest"
-          enable-cache: false
           python-version: "3.15"
           activate-environment: true
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/Aoi
-          ref: ${{ needs.resolve-aoi.outputs.sha }}
+          ref: ${{ needs.resolve-vendor.outputs.sha }}
           path: .test-deps/aoi
           persist-credentials: false
       - name: Compare vendored tools to the resolved Aoi tree
         env:
-          EXPECTED_SHA: ${{ needs.resolve-aoi.outputs.sha }}
+          EXPECTED_SHA: ${{ needs.resolve-vendor.outputs.sha }}
           EVENT_NAME: ${{ github.event_name }}
           GITHUB_REF: ${{ github.ref }}
           AOI_REPOSITORY_ID: "1402862784"
@@ -121,7 +127,7 @@ jobs:
 
   test:
     if: needs.changes.outputs.product_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    needs: [changes, resolve-aoi]
+    needs: [changes, resolve-vendor]
     name: pytest (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -142,18 +148,21 @@ jobs:
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "latest"
-          enable-cache: false
           python-version: "${{ matrix.python }}"
           activate-environment: true
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/Aoi
-          ref: ${{ needs.resolve-aoi.outputs.sha }}
+          ref: ${{ needs.resolve-vendor.outputs.sha }}
           path: .test-deps/aoi
           persist-credentials: false
       - name: Source checkout provenance
         env:
-          EXPECTED_SHA: ${{ needs.resolve-aoi.outputs.sha }}
+          EXPECTED_SHA: ${{ needs.resolve-vendor.outputs.sha }}
           EVENT_NAME: ${{ github.event_name }}
           GITHUB_REF: ${{ github.ref }}
         run: |
@@ -208,7 +217,7 @@ jobs:
   polars-min:
     name: collect (real polars, then polars uninstalled)
     if: needs.changes.outputs.product_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    needs: [changes, resolve-aoi]
+    needs: [changes, resolve-vendor]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -218,17 +227,20 @@ jobs:
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "latest"
-          enable-cache: false
           python-version: "3.15"
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: myon-bioinformatics/Aoi
-          ref: ${{ needs.resolve-aoi.outputs.sha }}
+          ref: ${{ needs.resolve-vendor.outputs.sha }}
           path: .test-deps/aoi
           persist-credentials: false
       - name: Verify checkout matches resolved SHA
         env:
-          AOI_SHA: ${{ needs.resolve-aoi.outputs.sha }}
+          AOI_SHA: ${{ needs.resolve-vendor.outputs.sha }}
         run: |
           set -euo pipefail
           if [[ ! "$AOI_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -306,9 +318,12 @@ jobs:
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "latest"
-          enable-cache: false
           python-version: "3.11"
           activate-environment: true
+          enable-cache: true
+          # Pull requests restore the cache and never write it; only main saves it.
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          prune-cache: true
       - name: Run local CI
         env:
           GITHUB_TOKEN: ${{ github.token }}
