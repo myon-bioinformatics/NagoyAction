@@ -58,6 +58,8 @@ python local_forge.py repo ls
 
 The olnm integration and BlueProbe/QueRyu launchers are not yet migrated. Do not run both managers concurrently against the same forge.
 
+CI's `real-local-forge` job downloads and checksum-verifies Gitea 1.27.3, starts it on localhost in temporary state, and exercises repository creation, push, issue, and pull request operations. The test has no dependency on a real GitHub account or a persistent user configuration. Forgejo remains covered by the fake-server tests only.
+
 No installation needed. It runs on the Python 3.11+ standard library alone.
 
 ```bash
