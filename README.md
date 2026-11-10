@@ -48,6 +48,8 @@ A repository split out from the [Aoi](https://github.com/myon-bioinformatics/Aoi
 
 `local_forge.py` provides the local Gitea/Forgejo management functions extracted from OneLinearNumerousMemo. It uses the existing `OLNM_HOME` and `DIAL_FILE` locations so that a local forge can be found during migration. This is a standalone standard-library command; it does not implement GitHub Actions runners.
 
+The repository can also be installed as a uv tool: `uv tool install .` from a checkout. This installs the `nagoyaction` and `local-forge` commands; the two Python files are independent modules and have no third-party runtime dependencies. Pipeline definitions and project-specific inputs remain separate files.
+
 ```bash
 python local_forge.py --help
 python local_forge.py status
