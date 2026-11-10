@@ -356,6 +356,8 @@ def _parser() -> JsonArgumentParser:
     _add_json_flag(r, "人間向けの行を出さず、stdout に schema nagoyaction-run/1 を書く。"
                       " doctor が止めたときは、その代わりに nagoyaction-doctor/1 を1つだけ書く。"
                       " 手順が失敗したときは、その終了コードと stderr の nagoyaction-error/1（error.code=step）。")
+    for each in (ap, *sub.choices.values()):
+        each.suggest_on_error = True  # 🤔 argparse 3.14+: "maybe you meant" for subcommands; older Pythons ignore it
     return ap
 
 
