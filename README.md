@@ -58,6 +58,8 @@ python local_forge.py repo ls
 
 The olnm integration and BlueProbe/QueRyu launchers are not yet migrated. Do not run both managers concurrently against the same forge.
 
+A newly started forge must pass its health check before startup reports success. Failed startup stops only the child created by that invocation; if cleanup fails, its PID is retained for inspection. A dial change saves its new value only after applying the forge and repository changes. This is not a transaction: earlier process, remote, repository, or mirror changes are not automatically rolled back if a later operation fails. Inspect the forge and repository remotes before retrying; the retained previous dial does not prove every side effect was reverted.
+
 CI's `real-local-forge` job downloads and checksum-verifies Gitea 1.27.3, starts it on localhost in temporary state, and exercises repository creation, push, issue, and pull request operations. The test has no dependency on a real GitHub account or a persistent user configuration. Forgejo remains covered by the fake-server tests only.
 
 No installation needed. It runs on the Python 3.11+ standard library alone.

@@ -30,10 +30,15 @@ def dial(level: int | None = None) -> int:
         return lv
     if level not in DIALS:
         raise SystemExit("❌ dial must be 0..3")
-    _write_dial(level)
+    try:
+        if FSTATE.exists():
+            _hub_apply(level)
+        _write_dial(level)
+    except (Exception, SystemExit):
+        print("❌ dial change did not complete; inspect forge and repository remotes before retrying. "
+              "Earlier side effects are not automatically rolled back.", file=sys.stderr)
+        raise
     print(f"🎛️  → {level} {DIALS[level]}" + ("  🌍 one-liners stubbed" if level <= 1 else ""))
-    if FSTATE.exists():
-        _hub_apply(level)
     return level
 
 
@@ -248,18 +253,43 @@ def hub_up() -> int:
     if os.geteuid() == 0:
         print("⚠️  running as root: Gitea / Forgejo refuse to serve as root → run olnm as a normal user")
     LOG.mkdir(parents=True, exist_ok=True)
-    p = subprocess.Popen([str(BIN), "--config", str(INI), "web"], stdout=(LOG / "web.out").open("a"), stderr=subprocess.STDOUT, start_new_session=True)
-    PID.write_text(str(p.pid))
-    port = hub_port()
-    for _ in range(60):
+    with (LOG / "web.out").open("a") as output:
+        p = subprocess.Popen([str(BIN), "--config", str(INI), "web"], stdout=output,
+                             stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        PID.write_text(str(p.pid))
+        port = hub_port()
+        for _ in range(60):
+            if p.poll() is not None:
+                raise SystemExit(f"❌ forge exited before becoming healthy → {LOG / 'web.out'}")
+            try:
+                _fetch(f"http://127.0.0.1:{port}/api/healthz", timeout=2)
+                if p.poll() is not None:
+                    raise SystemExit(f"❌ forge exited during startup → {LOG / 'web.out'}")
+                print(f"🏠 up pid={p.pid} → http://localhost:{port}")
+                return p.pid
+            except (urllib.error.URLError, TimeoutError, ConnectionError):
+                time.sleep(0.5)
+        raise SystemExit(f"❌ forge health check timed out → {LOG / 'web.out'}")
+    except BaseException:
+        # Only stop the child created by this call, never a PID read from shared state.
+        stopped = p.poll() is not None
         try:
-            _fetch(f"http://127.0.0.1:{port}/api/healthz", timeout=2)
-            print(f"🏠 up pid={p.pid} → http://localhost:{port}")
-            return p.pid
-        except (urllib.error.URLError, TimeoutError, ConnectionError):
-            time.sleep(0.5)
-    print(f"⚠️  started but health check timed out → {LOG / 'web.out'}")
-    return p.pid
+            if not stopped:
+                p.terminate()
+                try:
+                    p.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+                    p.wait(timeout=5)
+                stopped = True
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print(f"⚠️  failed to stop startup child {p.pid}: {exc}; inspect {LOG / 'web.out'}",
+                  file=sys.stderr)
+        # A different manager may have replaced the PID file during startup.
+        if stopped and PID.exists() and PID.read_text().strip() == str(p.pid):
+            PID.unlink()
+        raise
 
 
 def hub_down() -> None:
