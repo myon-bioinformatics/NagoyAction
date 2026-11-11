@@ -1127,10 +1127,16 @@ def test_lint_runs_only_actionlint_and_pin_checks(tmp_path, monkeypatch):
             return localci.Outcome("fail" if check.kind == "actionlint" else "pass", "x", [])
 
     monkeypatch.setattr(localci, "Session", FakeSession)
-    rc = localci.main(["lint", "--root", str(tmp_path), "--strict", "--seed", "5"])
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.chdir(repo)  # the default root is where you are
+    rc = localci.main(["lint", "--strict", "--seed", "5"])
     assert rc == 1
     assert sorted(ran) == ["actionlint", "pin"]  # a failing actionlint does not hide the pin result
     assert made["strict"] is True
+    assert made["cache"] == tmp_path / "cache" / "nagoyaction" / "localci"
+    assert not (repo / ".localci").exists()  # linting another repository writes nothing into it
 
 
 def test_nagoyaction_actionlint_routes_to_lint_and_all_to_run(monkeypatch, capsys):

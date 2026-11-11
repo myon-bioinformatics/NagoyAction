@@ -1072,8 +1072,9 @@ class Session:
     def __init__(self, root: Path, *, token: str = "", strict: bool = False,
                  runner=subprocess.run, opener=urllib.request.urlopen,
                  actionlint: Path | None | str = "auto",
-                 aoi_resolved: Resolved | None = None, aoi_ref: str = ""):
+                 aoi_resolved: Resolved | None = None, aoi_ref: str = "", cache: Path | None = None):
         self.root = root
+        self.cache = cache or root / ".localci"  # actionlint binary + record
         self.token = token
         self.strict = strict
         self.runner = runner
@@ -1094,7 +1095,7 @@ class Session:
         if isinstance(self.actionlint, Path):
             self.actionlint_record = ActionlintRecord("", "", "", self.actionlint, "path")
             return self.actionlint_record
-        record = ensure_actionlint(self.root / ".localci", token=self.token, opener=self.opener)
+        record = ensure_actionlint(self.cache, token=self.token, opener=self.opener)
         if record.via == "go":
             if not record.tag:
                 raise LocalCIError("actionlint tag was not resolved")
@@ -1275,9 +1276,14 @@ def _emit_print(text: str) -> None:
 LINT_KINDS = ("actionlint", "pin")  # `lint`: workflow checks only — no SHA resolution, no pytest, no Aoi checkout
 
 
+def lint_cache() -> Path:
+    """Where `lint` keeps actionlint and its record, so linting another repository writes nothing into it."""
+    return Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "nagoyaction" / "localci"
+
+
 def run_local(root: Path, *, repeat: int, seed: int | None, keep_going: bool, strict: bool,
               pytest_paths: list[str] | None, skip_pytest: bool, env_file: Path | None,
-              self_tests: bool = False, aoi_ref: str = "", kinds: tuple[str, ...] | None = None,
+              self_tests: bool = False, aoi_ref: str = "", kinds: tuple[str, ...] | None = None, cache: Path | None = None,
               token: str | None = None, runner=subprocess.run, opener=urllib.request.urlopen,
               emit=_emit_print) -> int:
     master = seed if seed is not None else random.SystemRandom().randrange(1, 2**31)
@@ -1299,7 +1305,7 @@ def run_local(root: Path, *, repeat: int, seed: int | None, keep_going: bool, st
             emit(f"  - {item}")
     session = Session(
         root, token=token, strict=strict, runner=runner, opener=opener,
-        aoi_resolved=aoi_resolved, aoi_ref=aoi_ref,
+        aoi_resolved=aoi_resolved, aoi_ref=aoi_ref, cache=cache,
     )
     actionlint_record = None
     if any(check.kind == "actionlint" for check in checks):
@@ -1379,8 +1385,8 @@ def _parser(prog: str | None = None) -> argparse.ArgumentParser:
     lint = sub.add_parser("lint", prog=prog, help="🔍 actionlint と uses: のピン検査だけ（SHA 解決・pytest・Aoi checkout なし）")
     lint.add_argument("--strict", action="store_true", help="古い SHA ピンを失敗にする。setup 以外の actions/* の vN は許す")
     lint.add_argument("--seed", type=int, default=None, help="入力の差し替えを再現する")
-    lint.add_argument("--root", type=Path, default=None)
-    lint.add_argument("--env-file", type=Path, default=None)
+    lint.add_argument("--root", type=Path, default=None, help="検査するリポジトリ。既定は今いるディレクトリ")
+    lint.add_argument("--env-file", type=Path, default=None, help="actionlint の記録の書き先。既定はユーザーキャッシュ（~/.cache/nagoyaction/localci）")
     run = sub.add_parser("run", prog=f"{prog} --all" if prog else None, help="actionlint、ピン検査、SHA 解決、pytest をシャードして実行する")
     run.add_argument("--repeat", type=_positive, default=1, help="シャード数。各検査は全ラウンドで一度だけ走る")
     run.add_argument("--seed", type=int, default=None, help="シャッフルと入力の差し替えを再現する")
@@ -1418,13 +1424,14 @@ def main(argv: list[str] | None = None, prog: str | None = None) -> int:
     if not argv or argv[0] not in {"run", "lint", "resolve", "-h", "--help"}:
         argv = ["run", *argv]
     args = _parser(prog).parse_args(argv)
-    root = (args.root or Path(__file__).resolve().parent).resolve()
+    root = (args.root or (Path.cwd() if args.cmd == "lint" else Path(__file__).resolve().parent)).resolve()
     try:
         if args.cmd == "resolve":
             return run_resolve(root, aoi_ref=args.aoi_ref, env_file=args.env_file, github_output=args.github_output)
         if args.cmd == "lint":
+            cache = lint_cache()
             return run_local(root, repeat=1, seed=args.seed, keep_going=True, strict=args.strict, pytest_paths=None,
-                             skip_pytest=True, env_file=args.env_file, kinds=LINT_KINDS)
+                             skip_pytest=True, env_file=args.env_file or cache / "refs.env", kinds=LINT_KINDS, cache=cache)
         return run_local(
             root, repeat=args.repeat, seed=args.seed, keep_going=args.keep_going, strict=args.strict,
             pytest_paths=args.pytest_paths, skip_pytest=args.skip_pytest, env_file=args.env_file,
