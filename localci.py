@@ -1272,9 +1272,12 @@ def _emit_print(text: str) -> None:
     print(text, flush=True)
 
 
+LINT_KINDS = ("actionlint", "pin")  # `lint`: workflow checks only — no SHA resolution, no pytest, no Aoi checkout
+
+
 def run_local(root: Path, *, repeat: int, seed: int | None, keep_going: bool, strict: bool,
               pytest_paths: list[str] | None, skip_pytest: bool, env_file: Path | None,
-              self_tests: bool = False, aoi_ref: str = "",
+              self_tests: bool = False, aoi_ref: str = "", kinds: tuple[str, ...] | None = None,
               token: str | None = None, runner=subprocess.run, opener=urllib.request.urlopen,
               emit=_emit_print) -> int:
     master = seed if seed is not None else random.SystemRandom().randrange(1, 2**31)
@@ -1284,6 +1287,8 @@ def run_local(root: Path, *, repeat: int, seed: int | None, keep_going: bool, st
         root, pytest_paths=pytest_paths, skip_pytest=skip_pytest, self_tests=self_tests,
         aoi_ref=aoi_ref, token=token, runner=runner, opener=opener, emit=emit,
     )
+    if kinds is not None:
+        checks = [check for check in checks if check.kind in kinds]
     shards = split_shards(checks, repeat, master)
     shellcheck = shellcheck_path()
     emit(f"localci seed={master} checks={len(checks)} rounds={repeat}")
@@ -1367,10 +1372,16 @@ def run_resolve(root: Path, *, aoi_ref: str, env_file: Path | None, github_outpu
     return 0
 
 
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="ワークフローとテストを手元で検査する（GitHub Actions と同じ解決）")
+def _parser(prog: str | None = None) -> argparse.ArgumentParser:
+    """prog: `nagoyaction actionlint` shows `lint` as itself and `run` as `… --all`."""
+    parser = argparse.ArgumentParser(prog=prog, description="ワークフローとテストを手元で検査する（GitHub Actions と同じ解決）")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    run = sub.add_parser("run", help="actionlint、ピン検査、SHA 解決、pytest をシャードして実行する")
+    lint = sub.add_parser("lint", prog=prog, help="🔍 actionlint と uses: のピン検査だけ（SHA 解決・pytest・Aoi checkout なし）")
+    lint.add_argument("--strict", action="store_true", help="古い SHA ピンを失敗にする。setup 以外の actions/* の vN は許す")
+    lint.add_argument("--seed", type=int, default=None, help="入力の差し替えを再現する")
+    lint.add_argument("--root", type=Path, default=None)
+    lint.add_argument("--env-file", type=Path, default=None)
+    run = sub.add_parser("run", prog=f"{prog} --all" if prog else None, help="actionlint、ピン検査、SHA 解決、pytest をシャードして実行する")
     run.add_argument("--repeat", type=_positive, default=1, help="シャード数。各検査は全ラウンドで一度だけ走る")
     run.add_argument("--seed", type=int, default=None, help="シャッフルと入力の差し替えを再現する")
     run.add_argument("--keep-going", action="store_true", help="失敗したあとも残りのラウンドを実行する")
@@ -1401,16 +1412,19 @@ def _positive(text: str) -> int:
     return value
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, prog: str | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
-    if not argv or argv[0] not in {"run", "resolve", "-h", "--help"}:
+    if not argv or argv[0] not in {"run", "lint", "resolve", "-h", "--help"}:
         argv = ["run", *argv]
-    args = _parser().parse_args(argv)
+    args = _parser(prog).parse_args(argv)
     root = (args.root or Path(__file__).resolve().parent).resolve()
     try:
         if args.cmd == "resolve":
             return run_resolve(root, aoi_ref=args.aoi_ref, env_file=args.env_file, github_output=args.github_output)
+        if args.cmd == "lint":
+            return run_local(root, repeat=1, seed=args.seed, keep_going=True, strict=args.strict, pytest_paths=None,
+                             skip_pytest=True, env_file=args.env_file, kinds=LINT_KINDS)
         return run_local(
             root, repeat=args.repeat, seed=args.seed, keep_going=args.keep_going, strict=args.strict,
             pytest_paths=args.pytest_paths, skip_pytest=args.skip_pytest, env_file=args.env_file,

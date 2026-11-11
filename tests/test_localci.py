@@ -1104,3 +1104,45 @@ def test_web_ui_source_uses_canonical_name_and_preserves_identity():
         with pytest.raises(localci.LocalCIError):
             localci.resolve_source(source, opener=Opener({api: {**data, **change}}),
                                    runner=lambda *a, **k: pytest.fail("must reject before git"))
+
+
+def test_lint_runs_only_actionlint_and_pin_checks(tmp_path, monkeypatch):
+    # 🔍 `lint` (= nagoyaction actionlint): workflow checks only; no SHA resolution, pytest or Aoi checkout.
+    checks = [localci.Check("r", "resolve", "r", repo="r"), localci.Check("a", "actionlint", "ci.yml", file="ci.yml"),
+              localci.Check("p", "pin", "x/y@v1", file="ci.yml", ref="v1", repo="x/y"), localci.Check("t", "pytest", "t")]
+    monkeypatch.setattr(localci, "build_checks", lambda *a, **k: (list(checks), []))
+    monkeypatch.setattr(localci, "checkout_aoi", lambda *a, **k: pytest.fail("lint must not check out Aoi"))
+    ran, made = [], {}
+
+    class FakeSession:
+        def __init__(self, *args, **kwargs):
+            made.update(kwargs)
+            self.resolved = {}
+
+        def prepare_actionlint(self):
+            return None
+
+        def execute(self, check):
+            ran.append(check.kind)
+            return localci.Outcome("fail" if check.kind == "actionlint" else "pass", "x", [])
+
+    monkeypatch.setattr(localci, "Session", FakeSession)
+    rc = localci.main(["lint", "--root", str(tmp_path), "--strict", "--seed", "5"])
+    assert rc == 1
+    assert sorted(ran) == ["actionlint", "pin"]  # a failing actionlint does not hide the pin result
+    assert made["strict"] is True
+
+
+def test_nagoyaction_actionlint_routes_to_lint_and_all_to_run(monkeypatch, capsys):
+    import nagoyaction
+    seen = []
+    monkeypatch.setattr(localci, "run_local", lambda root, **kw: seen.append(kw) or 0)
+    assert nagoyaction.main(["actionlint", "--strict"]) == 0
+    assert seen[-1]["kinds"] == localci.LINT_KINDS and seen[-1]["strict"] and seen[-1]["skip_pytest"]
+    assert nagoyaction.actionlint("--all", "--repeat", "3", "--skip-pytest") == 0
+    assert seen[-1].get("kinds") is None and seen[-1]["repeat"] == 3
+    assert nagoyaction.main(["--json", "actionlint"]) == 0  # the global flag before the subcommand still routes
+    with pytest.raises(SystemExit) as exc:
+        nagoyaction.main(["actionlint", "--help"])
+    assert exc.value.code == 0
+    assert "usage: nagoyaction actionlint" in capsys.readouterr().out

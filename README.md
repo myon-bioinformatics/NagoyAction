@@ -51,13 +51,13 @@ A repository split out from the [Aoi](https://github.com/myon-bioinformatics/Aoi
 Prepare an isolated uv tool project with `python tools/build_uv_tool.py build/nagoyaction-tool`, then install it with `uv tool install ./build/nagoyaction-tool`. This installs the `nagoyaction` and `local-forge` commands; the two Python files are independent modules and have no third-party runtime dependencies. Pipeline definitions and project-specific inputs remain separate files.
 
 ```bash
-nagoyaction forge --help        # or: python nagoyaction.py forge --help
-nagoyaction forge status
-nagoyaction forge dial mirror   # 🎛️  → 🔁 mirror (2)
-nagoyaction forge repo ls
+nagoyaction hub --help          # or: python nagoyaction.py hub --help
+nagoyaction hub status
+nagoyaction hub dial mirror     # 🎛️  → 🔁 mirror (2)
+nagoyaction hub repo ls
 ```
 
-`nagoyaction forge …` passes every argument to `local_forge.py`; `local-forge …` and `python local_forge.py …` are the same command. From Python, `nagoyaction.forge("dial", "local")` does the same and returns the exit code. `local_forge.py` is imported only for `forge`, so pipeline commands never load it.
+`nagoyaction hub …` passes every argument to `local_forge.py`; `local-forge …` and `python local_forge.py …` are the same command, and OneLinearNumerousMemo's `olnm hub …` forwards here. From Python, `nagoyaction.hub("dial", "local")` does the same and returns the exit code. `local_forge.py` is imported only for `hub`, so pipeline commands never load it.
 
 The dial takes a name: `offline` (no network), `local` (local forge only), `mirror` (local forge that mirrors GitHub) or `github` (GitHub directly). Output shows the name first and the stored digit after it, for example `🔁 mirror (2)`. The dial file keeps the digit 0–3, so older readers of `DIAL_FILE` keep working, and `dial 2` is still accepted. A mistyped name is rejected with a suggestion (`maybe you meant 'mirror'?` on Python 3.14+) and leaves the dial unchanged.
 
@@ -105,6 +105,8 @@ To bring in shared modules from other repositories, use that repository's `vendo
 
 Checks workflows and tests locally without waiting for GitHub Actions to finish.
 
+`nagoyaction actionlint` runs only actionlint and the `uses:` pin checks: no SHA resolution, no pytest, no Aoi checkout. It reports every failure in one pass, and `--strict` makes stale SHA pins fail. `nagoyaction actionlint --all …` is `python localci.py run …` (options included). From Python, `nagoyaction.actionlint("--strict")` returns the exit code. `python localci.py lint` is the same check without nagoyaction.
+
 `python localci.py run` checks `.github/workflows` with actionlint. If shellcheck is on PATH, actionlint also uses it for `run:` blocks. actionlint resolves the latest rhysd/actionlint release on every run and verifies the published checksums and GitHub's digest. The version is not pinned in source. The resolved tag, asset name, and verified sha256 are left in the output and `.localci/refs.env`, and written next to the resolved referenced SHAs if `GITHUB_STEP_SUMMARY` exists. On GitHub Actions it stops if fetching or verification fails and does not fall back to Go. Locally, only when the tag could be resolved, it falls back to `go run github.com/rhysd/actionlint/cmd/actionlint@<tag>`. At the same time it resolves the main SHA of referenced repositories with `git ls-remote` plus a GitHub API repository id check, and writes them to `.localci/refs.env`. Whether `uses:` pins match the commit of each action's latest release tag is only reported by default. Setup actions (`actions/setup-python`, `actions/setup-node`, `astral-sh/setup-uv`) use the release's 40-character SHA and `# vX.Y.Z`. Other `actions/*` use the moving major tag `vN`.
 
 ```bash
@@ -115,6 +117,8 @@ python localci.py run --repeat 10 --keep-going
 python localci.py run --self-tests            # only tests/test_localci.py (no Aoi)
 python localci.py run --strict                # fail on stale SHA pins; vN for non-setup actions/* is allowed
 python localci.py resolve                     # only resolve SHAs; CI's resolve job uses this too
+nagoyaction actionlint                        # actionlint + uses: pins only (= python localci.py lint)
+nagoyaction actionlint --strict --all --repeat 10   # = python localci.py run --strict --repeat 10
 ```
 
 `--repeat N` does not trace the same checks N times. It shuffles the check list (resolving references, actionlint, each `uses:`, the pytest tests) by seed and splits it into N nearly equal shards. Each round runs only one shard, and once all rounds finish every check has run exactly once. It stops at a failing round and prints the round number, shard contents, and seed. `--keep-going` continues. After each round it prints the number of rounds passed and completed against N. Getting deep without failures is a confidence signal that the remaining shards will pass too.

@@ -183,27 +183,27 @@ def nagoyaction(*argv, home):
     return subprocess.run([sys.executable, str(ROOT / "nagoyaction.py"), *argv], capture_output=True, text=True, env=env, timeout=60)
 
 
-class TestNagoyactionForge(unittest.TestCase):
-    """🏠 nagoyaction.py forge … hands every argument to local_forge (exit codes included)."""
+class TestNagoyactionHub(unittest.TestCase):
+    """🏠 nagoyaction.py hub … hands every argument to local_forge (exit codes included)."""
 
     def setUp(self):
-        self.home = Path(tempfile.mkdtemp(prefix="nagoyaction-forge-"))
+        self.home = Path(tempfile.mkdtemp(prefix="nagoyaction-hub-"))
         self.addCleanup(shutil.rmtree, self.home, True)
 
     def test_dial_and_status_through_nagoyaction(self):
-        self.assertIn("🔁 mirror (2)", nagoyaction("forge", "dial", "mirror", home=self.home).stdout)
+        self.assertIn("🔁 mirror (2)", nagoyaction("hub", "dial", "mirror", home=self.home).stdout)
         self.assertEqual((self.home / "dial").read_text().strip(), "2")
-        shown = nagoyaction("forge", "dial", home=self.home)
+        shown = nagoyaction("hub", "dial", home=self.home)
         self.assertEqual(shown.returncode, 0)
         self.assertIn("🔁 mirror (2)", shown.stdout)
-        self.assertIn("🔁 mirror (2) | ⚪ down", nagoyaction("forge", "status", home=self.home).stdout)
+        self.assertIn("🔁 mirror (2) | ⚪ down", nagoyaction("hub", "status", home=self.home).stdout)
 
     def test_help_and_typos_reach_local_forge(self):
-        helped = nagoyaction("forge", "dial", "--help", home=self.home)
+        helped = nagoyaction("hub", "dial", "--help", home=self.home)
         self.assertEqual(helped.returncode, 0)
-        self.assertIn("usage: nagoyaction forge dial", helped.stdout)
-        self.assertNotIn("forge hub", helped.stdout)
-        typo = nagoyaction("forge", "dial", "mirorr", home=self.home)
+        self.assertIn("usage: nagoyaction hub dial", helped.stdout)
+        self.assertNotIn("hub hub", helped.stdout)  # local_forge's internal "hub" stays hidden
+        typo = nagoyaction("hub", "dial", "mirorr", home=self.home)
         self.assertEqual(typo.returncode, 2)
         self.assertIn("invalid choice: 'mirorr'", typo.stderr)
         if sys.version_info >= (3, 14):
@@ -212,7 +212,7 @@ class TestNagoyactionForge(unittest.TestCase):
 
     def test_python_callable_by_name(self):
         code = ("import os, sys; sys.path.insert(0, sys.argv[1]); import nagoyaction;"
-                " sys.exit(nagoyaction.forge('dial', 'local'))")
+                " sys.exit(nagoyaction.hub('dial', 'local'))")
         env = dict(os.environ, OLNM_HOME=str(self.home), DIAL_FILE=str(self.home / "dial"))
         run = subprocess.run([sys.executable, "-c", code, str(ROOT)], capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(run.returncode, 0, run.stderr)
