@@ -51,12 +51,17 @@ A repository split out from the [Aoi](https://github.com/myon-bioinformatics/Aoi
 Prepare an isolated uv tool project with `python tools/build_uv_tool.py build/nagoyaction-tool`, then install it with `uv tool install ./build/nagoyaction-tool`. This installs the `nagoyaction` and `local-forge` commands; the two Python files are independent modules and have no third-party runtime dependencies. Pipeline definitions and project-specific inputs remain separate files.
 
 ```bash
-python local_forge.py --help
-python local_forge.py status
-python local_forge.py repo ls
+nagoyaction forge --help        # or: python nagoyaction.py forge --help
+nagoyaction forge status
+nagoyaction forge dial mirror   # 🎛️  → 🔁 mirror (2)
+nagoyaction forge repo ls
 ```
 
-The olnm integration and BlueProbe/QueRyu launchers are not yet migrated. Do not run both managers concurrently against the same forge.
+`nagoyaction forge …` passes every argument to `local_forge.py`; `local-forge …` and `python local_forge.py …` are the same command. From Python, `nagoyaction.forge("dial", "local")` does the same and returns the exit code. `local_forge.py` is imported only for `forge`, so pipeline commands never load it.
+
+The dial takes a name: `offline` (no network), `local` (local forge only), `mirror` (local forge that mirrors GitHub) or `github` (GitHub directly). Output shows the name first and the stored digit after it, for example `🔁 mirror (2)`. The dial file keeps the digit 0–3, so older readers of `DIAL_FILE` keep working, and `dial 2` is still accepted. A mistyped name is rejected with a suggestion (`maybe you meant 'mirror'?` on Python 3.14+) and leaves the dial unchanged.
+
+OneLinearNumerousMemo forwards `olnm hub …` and `olnm dial …` here once its handover change is merged. The BlueProbe/QueRyu launchers are not yet migrated. Do not run both managers concurrently against the same forge.
 
 A newly started forge must pass its health check before startup reports success. Failed startup stops only the child created by that invocation; if cleanup fails, its PID is retained for inspection. A dial change saves its new value only after applying the forge and repository changes. This is not a transaction: earlier process, remote, repository, or mirror changes are not automatically rolled back if a later operation fails. Inspect the forge and repository remotes before retrying; the retained previous dial does not prove every side effect was reverted.
 

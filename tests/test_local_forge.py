@@ -152,3 +152,68 @@ class TestHub(HubBase):
             olnm.hub_api("GET", "/user/repos", token="wrong")
         self.assertIn("401", str(e.exception))
 
+
+
+class TestDialNames(unittest.TestCase):
+    """🎛️ People type names; the shared dial file keeps the digit (olnm reads the same file)."""
+
+    def setUp(self):
+        reset_forge()
+
+    def test_names_digits_and_rejects(self):
+        for given, level in (("offline", 0), ("Local", 1), (" mirror ", 2), ("github", 3), ("2", 2), (0, 0)):
+            with self.subTest(given=given):
+                self.assertEqual(olnm.dial_level(given), level)
+        for bad in ("4", "mirorr", "", True, 7):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                olnm.dial_level(bad)
+
+    def test_dial_by_name_stores_digit_and_shows_name_first(self):
+        self.assertEqual(olnm.dial("mirror"), 2)
+        self.assertEqual(olnm.DIAL_FILE.read_text().strip(), "2")
+        self.assertEqual(olnm.dial_label(2), "🔁 mirror (2)")
+        with self.assertRaises(SystemExit) as e:
+            olnm.dial("mirorr")
+        self.assertIn("offline, local, mirror, github", str(e.exception))
+        self.assertEqual(olnm.read_dial(), 2)  # a rejected name changes nothing
+
+
+def nagoyaction(*argv, home):
+    env = dict(os.environ, OLNM_HOME=str(home), DIAL_FILE=str(home / "dial"))
+    return subprocess.run([sys.executable, str(ROOT / "nagoyaction.py"), *argv], capture_output=True, text=True, env=env, timeout=60)
+
+
+class TestNagoyactionForge(unittest.TestCase):
+    """🏠 nagoyaction.py forge … hands every argument to local_forge (exit codes included)."""
+
+    def setUp(self):
+        self.home = Path(tempfile.mkdtemp(prefix="nagoyaction-forge-"))
+        self.addCleanup(shutil.rmtree, self.home, True)
+
+    def test_dial_and_status_through_nagoyaction(self):
+        self.assertIn("🔁 mirror (2)", nagoyaction("forge", "dial", "mirror", home=self.home).stdout)
+        self.assertEqual((self.home / "dial").read_text().strip(), "2")
+        shown = nagoyaction("forge", "dial", home=self.home)
+        self.assertEqual(shown.returncode, 0)
+        self.assertIn("🔁 mirror (2)", shown.stdout)
+        self.assertIn("🔁 mirror (2) | ⚪ down", nagoyaction("forge", "status", home=self.home).stdout)
+
+    def test_help_and_typos_reach_local_forge(self):
+        helped = nagoyaction("forge", "dial", "--help", home=self.home)
+        self.assertEqual(helped.returncode, 0)
+        self.assertIn("usage: nagoyaction forge dial", helped.stdout)
+        self.assertNotIn("forge hub", helped.stdout)
+        typo = nagoyaction("forge", "dial", "mirorr", home=self.home)
+        self.assertEqual(typo.returncode, 2)
+        self.assertIn("invalid choice: 'mirorr'", typo.stderr)
+        if sys.version_info >= (3, 14):
+            self.assertIn("maybe you meant 'mirror'?", typo.stderr)
+        self.assertFalse((self.home / "dial").exists())
+
+    def test_python_callable_by_name(self):
+        code = ("import os, sys; sys.path.insert(0, sys.argv[1]); import nagoyaction;"
+                " sys.exit(nagoyaction.forge('dial', 'local'))")
+        env = dict(os.environ, OLNM_HOME=str(self.home), DIAL_FILE=str(self.home / "dial"))
+        run = subprocess.run([sys.executable, "-c", code, str(ROOT)], capture_output=True, text=True, env=env, timeout=60)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual((self.home / "dial").read_text().strip(), "1")

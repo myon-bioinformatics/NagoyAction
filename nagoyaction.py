@@ -356,6 +356,12 @@ def _parser() -> JsonArgumentParser:
     _add_json_flag(r, "人間向けの行を出さず、stdout に schema nagoyaction-run/1 を書く。"
                       " doctor が止めたときは、その代わりに nagoyaction-doctor/1 を1つだけ書く。"
                       " 手順が失敗したときは、その終了コードと stderr の nagoyaction-error/1（error.code=step）。")
+    f = sub.add_parser(
+        "forge",
+        help="🏠 ローカル GitHub（Gitea / Forgejo）の操作。残りの引数を local_forge に渡す（例: forge status / forge dial mirror）",
+        add_help=False,
+    )
+    f.add_argument("forge_args", nargs=argparse.REMAINDER, help="local_forge の引数。一覧は forge --help")
     for each in (ap, *sub.choices.values()):
         each.suggest_on_error = True  # 🤔 argparse 3.14+: "maybe you meant" for subcommands; older Pythons ignore it
     return ap
@@ -372,13 +378,23 @@ def _report(json_mode: bool, exit_code: int, code: str, message: str, *, human: 
         print(human, file=sys.stderr)
 
 
+def forge(*argv: str) -> int:
+    """Gitea / Forgejo control: forge("status"), forge("dial", "mirror"). Same as `nagoyaction forge ...`."""
+    import local_forge  # only when asked, so pipeline commands never load it
+    return local_forge.main(list(argv), prog="nagoyaction forge")
+
+
 def main(argv=None) -> int:
     if argv is None:
         argv = sys.argv[1:]
     argv = list(argv)
+    if argv[:1] == ["forge"]:  # hand everything (incl. --help) to local_forge before this parser sees it
+        return forge(*argv[1:])
     ap = _parser()
     _arm_json(ap, "--json" in argv)
     args = ap.parse_args(argv)
+    if args.cmd == "forge":
+        return forge(*args.forge_args)
     json_mode = _json_mode(args, argv)
 
     try:

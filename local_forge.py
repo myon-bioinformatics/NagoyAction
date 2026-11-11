@@ -8,6 +8,24 @@ PY = Path(__file__).resolve()
 OLNM_HOME = Path(os.environ.get("OLNM_HOME", Path.home() / ".olnm"))
 DIAL_FILE = Path(os.environ.get("DIAL_FILE", OLNM_HOME / "dial"))
 DIALS = {0: "🔌 offline", 1: "🏠 local", 2: "🔁 mirror", 3: "☁️ github"}
+DIAL_NAMES = {"offline": 0, "local": 1, "mirror": 2, "github": 3}  # the file keeps the digit; names are for people
+
+
+def dial_level(value: int | str) -> int:
+    """offline|local|mirror|github (or 0-3) → 0-3. Raises ValueError for anything else."""
+    if isinstance(value, int) and not isinstance(value, bool) and value in DIALS:
+        return value
+    text = str(value).strip().lower()
+    if text in DIAL_NAMES:
+        return DIAL_NAMES[text]
+    if text.isdigit() and int(text) in DIALS:
+        return int(text)
+    raise ValueError(f"dial must be one of {', '.join(DIAL_NAMES)} (or 0-3), not {value!r}")
+
+
+def dial_label(level: int) -> str:
+    """'🔁 mirror (2)': the name first, the stored digit after it."""
+    return f"{DIALS[level]} ({level})"
 
 def read_dial(default: int = 3) -> int:
     """Current dial (0..3); unset = 3 (plain online box)."""
@@ -22,14 +40,16 @@ def _write_dial(level: int) -> None:
     DIAL_FILE.write_text(f"{level}\n")
 
 
-def dial(level: int | None = None) -> int:
-    """Show or set the dial. When the local forge exists, also start/stop it and re-point every repo's origin."""
+def dial(level: int | str | None = None) -> int:
+    """Show or set the dial (offline|local|mirror|github or 0-3). When the local forge exists, also start/stop it and re-point every repo's origin."""
     if level is None:
         lv = read_dial()
-        print(f"🎛️  {lv} {DIALS[lv]}  ({DIAL_FILE})")
+        print(f"🎛️  {dial_label(lv)}  ({DIAL_FILE})")
         return lv
-    if level not in DIALS:
-        raise SystemExit("❌ dial must be 0..3")
+    try:
+        level = dial_level(level)
+    except ValueError as error:
+        raise SystemExit(f"❌ {error}") from None
     try:
         if FSTATE.exists():
             _hub_apply(level)
@@ -38,7 +58,7 @@ def dial(level: int | None = None) -> int:
         print("❌ dial change did not complete; inspect forge and repository remotes before retrying. "
               "Earlier side effects are not automatically rolled back.", file=sys.stderr)
         raise
-    print(f"🎛️  → {level} {DIALS[level]}" + ("  🌍 one-liners stubbed" if level <= 1 else ""))
+    print(f"🎛️  → {dial_label(level)}" + ("  🌍 one-liners stubbed" if level <= 1 else ""))
     return level
 
 
@@ -303,7 +323,7 @@ def hub_down() -> None:
 def hub_status() -> dict:
     """Dial, forge state, repo count."""
     st, pid, lv = _fstate(), _running(), read_dial()
-    print(f"🎛️  {lv} {DIALS[lv]} | {'🟢 pid=' + str(pid) if pid else '⚪ down'} | 📚 {len(st['repos'])} | http://localhost:{st['port']}")
+    print(f"🎛️  {dial_label(lv)} | {'🟢 pid=' + str(pid) if pid else '⚪ down'} | 📚 {len(st['repos'])} | http://localhost:{st['port']}")
     return {"dial": lv, "pid": pid, "repos": st["repos"]}
 
 
@@ -514,17 +534,17 @@ def hub_doctor() -> dict:
 
 
 
-def build_parser():
-    ap = argparse.ArgumentParser(prog="local_forge")
+def build_parser(prog: str = "local_forge"):
+    ap = argparse.ArgumentParser(prog=prog)
     sp = ap.add_subparsers(dest="cmd", required=True)
-    s = sp.add_parser("hub", help="🏠 local GitHub-like forge"); h = s.add_subparsers(dest="sub", required=True)
+    s = sp.add_parser("hub", prog=prog, help="🏠 local GitHub-like forge"); h = s.add_subparsers(dest="sub", required=True)  # main() adds "hub"; keep it out of usage
     x = h.add_parser("install", help="📦 🌍 download or --from carried binary"); x.add_argument("--version", default="latest"); x.add_argument("--from", dest="src"); x.add_argument("--sha256", dest="sha"); x.add_argument("--flavor", choices=sorted(FLAVORS), default="gitea")
     x = h.add_parser("bundle", help="🎒 🌍 binary + .sha256 + olnm.py into DIR"); x.add_argument("dir"); x.add_argument("--version", default="latest"); x.add_argument("--flavor", choices=sorted(FLAVORS), default="gitea")
     x = h.add_parser("init", help="🏗️ config, db, admin, token"); x.add_argument("--port", type=int, default=3000); x.add_argument("--user", default="admin"); x.add_argument("--password")
     for name, hp in (("up", "🟢 start"), ("down", "🛑 stop"), ("status", "📊 status"), ("doctor", "🩺 checks"), ("sync", "🔄 push to all remotes"), ("labels", "🏷️ GitHub default labels")):
         h.add_parser(name, help=hp)
     x = h.add_parser("logs", help="📜 tail log"); x.add_argument("-n", type=int, default=40)
-    x = h.add_parser("dial", help="🎛️ same as olnm dial"); x.add_argument("level", nargs="?", type=int, choices=sorted(DIALS))
+    x = h.add_parser("dial", help="🎛️ show / set: offline · local · mirror · github (0-3 also work)"); x.add_argument("level", nargs="?", choices=[*DIAL_NAMES, *map(str, DIALS)], metavar="level", help="offline | local | mirror | github (0-3 also work); omit to show")
     x = h.add_parser("repo", help="📚 register working trees"); r = x.add_subparsers(dest="repo_cmd", required=True)
     y = r.add_parser("add"); y.add_argument("path", nargs="?", default="."); y.add_argument("--github", help="owner/name"); y.add_argument("--public", action="store_true")
     r.add_parser("ls"); y = r.add_parser("rm"); y.add_argument("path", nargs="?", default=".")
@@ -534,7 +554,17 @@ def build_parser():
     y = i.add_parser("new"); y.add_argument("title"); y.add_argument("--body", default=""); y.add_argument("--label", action="append", default=[])
     x = h.add_parser("pr", help="🔀 pull requests"); p = x.add_subparsers(dest="pr_cmd", required=True)
     p.add_parser("ls"); y = p.add_parser("new"); y.add_argument("title"); y.add_argument("--head"); y.add_argument("--base", default="main"); y.add_argument("--body", default="")
+    _suggest(ap)
     return ap
+
+
+def _suggest(parser: argparse.ArgumentParser) -> None:
+    # 🤔 argparse 3.14+: "maybe you meant 'mirror'?" for choices and subcommands at every level; older Pythons ignore it
+    parser.suggest_on_error = True
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for child in action.choices.values():
+                _suggest(child)
 
 def _hub_main(a: argparse.Namespace) -> None:
     match a.sub:
@@ -556,8 +586,8 @@ def _hub_main(a: argparse.Namespace) -> None:
 
 
 
-def main(argv=None):
-    args = build_parser().parse_args(["hub", *(sys.argv[1:] if argv is None else argv)])
+def main(argv=None, prog: str = "local_forge"):
+    args = build_parser(prog).parse_args(["hub", *(sys.argv[1:] if argv is None else argv)])
     _hub_main(args)
     return 0
 
