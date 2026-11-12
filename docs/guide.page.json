@@ -20,11 +20,11 @@
       "blocks": [
         {
           "type": "text",
-          "text": "1 ファイルを置くだけで動きます（pip 不要）。"
+          "text": "Python 3.11+ と git が必要です。以下の例はリポジトリ全体を取得して実行します。"
         },
         {
           "type": "output",
-          "text": "curl -fsSLO https://raw.githubusercontent.com/myon-bioinformatics/NagoyAction/main/nagoyaction.py"
+          "text": "git clone https://github.com/myon-bioinformatics/NagoyAction.git\ncd NagoyAction"
         }
       ]
     },
@@ -68,7 +68,7 @@
         {
           "type": "card",
           "title": "🔍 actionlint",
-          "text": "actionlint と uses: のピン検査をローカルで。",
+          "text": "actionlint と uses: のピン検査をローカルで。localci.py が必要です。actionlint は実行時に取得します。",
           "blocks": [
             {
               "type": "output",
@@ -79,7 +79,7 @@
         {
           "type": "card",
           "title": "🏠 hub",
-          "text": "ローカル GitHub（Gitea / Forgejo）の操作。local_forge.py が隣に必要です。",
+          "text": "ローカル GitHub（Gitea / Forgejo）の操作。local_forge.py が必要です。dial mirror は設定を変更し、既存 forge があれば起動・remote の切替も行います。",
           "blocks": [
             {
               "type": "output",
