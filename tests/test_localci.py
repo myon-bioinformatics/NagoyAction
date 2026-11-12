@@ -1145,6 +1145,9 @@ def test_nagoyaction_actionlint_routes_to_lint_and_all_to_run(monkeypatch, capsy
     monkeypatch.setattr(localci, "run_local", lambda root, **kw: seen.append(kw) or 0)
     assert nagoyaction.main(["actionlint", "--strict"]) == 0
     assert seen[-1]["kinds"] == localci.LINT_KINDS and seen[-1]["strict"] and seen[-1]["skip_pytest"]
+    assert seen[-1]["best_effort"] is False  # --strict: 検査できないものは失敗
+    assert nagoyaction.main(["actionlint"]) == 0
+    assert seen[-1]["best_effort"] is True
     assert nagoyaction.actionlint("--all", "--repeat", "3", "--skip-pytest") == 0
     assert seen[-1].get("kinds") is None and seen[-1]["repeat"] == 3
     assert nagoyaction.main(["--json", "actionlint"]) == 0  # the global flag before the subcommand still routes
@@ -1235,17 +1238,24 @@ def test_strict_and_github_actions_still_fail_closed(tmp_path, monkeypatch, best
         session.prepare_actionlint()
 
 
-def test_lint_exit_code_is_zero_with_skips_and_one_under_strict(tmp_path, monkeypatch, capsys):
+def test_lint_exit_code_is_zero_with_skips_and_strict_stops(tmp_path, monkeypatch):
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     monkeypatch.setattr(localci.shutil, "which", lambda name: None)
-    monkeypatch.setattr(localci.urllib.request, "urlopen", lambda req, timeout=60: (_ for _ in ()).throw(_unreachable(req.full_url)))
     workflows = tmp_path / "repo" / ".github" / "workflows"
     workflows.mkdir(parents=True)
     (workflows / "ci.yml").write_text("on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n")
-    monkeypatch.chdir(tmp_path / "repo")
-    assert localci.main(["lint", "--seed", "1"]) == 0
-    out = capsys.readouterr().out
+
+    def lint(best_effort, out):
+        return localci.run_local(
+            tmp_path / "repo", repeat=1, seed=1, keep_going=True, strict=not best_effort, pytest_paths=None, skip_pytest=True,
+            env_file=tmp_path / "refs.env", kinds=localci.LINT_KINDS, cache=tmp_path / "cache", best_effort=best_effort, token="",
+            opener=lambda req, timeout=60: (_ for _ in ()).throw(_unreachable(req.full_url)),
+            runner=lambda *a, **k: pytest.fail("nothing to run"), emit=out.append)
+
+    out = []
+    assert lint(True, out) == 0
     assert "[pass] round 1/1（2/2 件は skip）" in out
     assert "⚠️ best effort: 2 件は検査できず [skip]。何も確かめていない。失敗にするなら --strict" in out
-    assert localci.main(["lint", "--seed", "1", "--strict"]) == 1
+    assert not (tmp_path / "refs.env").exists()  # 使った actionlint が無いので記録もしない
+    with pytest.raises(localci.Unreachable):  # main() はこれを exit 1 にする
+        lint(False, [])

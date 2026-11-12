@@ -794,11 +794,11 @@ def cached_actionlint(cache: Path) -> ActionlintRecord | None:
     return max(found, key=lambda item: item[0])[1] if found else None
 
 
-def local_actionlint(cache: Path, note: str, which=shutil.which) -> ActionlintRecord:
+def local_actionlint(cache: Path, note: str, which=None) -> ActionlintRecord:
     """best effort: 最新版を使えないとき、取得済みの検証済み版 → PATH の actionlint → 無し（検査は skip）。"""
     if record := cached_actionlint(cache):
         return ActionlintRecord(record.tag, record.asset, record.sha256, record.binary, "cache", note)
-    if found := which("actionlint"):
+    if found := (which or shutil.which)("actionlint"):
         return ActionlintRecord("", "", "", Path(found), "path", note)
     return ActionlintRecord("", "", "", None, "none", note)
 
