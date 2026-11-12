@@ -92,7 +92,7 @@ def test_vendored_launcher_matches_lock():
 def test_vendored_license_comes_from_aoi_same_commit():
     lock = json.loads((ROOT / "vendor.lock.json").read_text(encoding="utf-8"))
     by_dest = {f["destination"]: f for f in lock["files"]}
-    assert set(by_dest) == {"vendor/py_launch.cjs", "vendor/aoi-LICENSE"}
+    assert set(by_dest) == {"vendor/py_launch.cjs", "vendor/aoi-LICENSE", "vendor/uv_tool_build.py"}
     lic = by_dest["vendor/aoi-LICENSE"]
     assert lic["repository"] == AOI
     assert lic["source"] == "LICENSE"
@@ -102,6 +102,21 @@ def test_vendored_license_comes_from_aoi_same_commit():
     assert hashlib.sha256(data).hexdigest() == lic["sha256"]
     assert hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest() == lic["blob_sha"]
     assert data == (ROOT / "LICENSE").read_bytes()
+
+
+def test_vendored_uv_tool_build_matches_lock():
+    lock = json.loads((ROOT / "vendor.lock.json").read_text(encoding="utf-8"))
+    entry = next(f for f in lock["files"] if f["destination"] == "vendor/uv_tool_build.py")
+    assert entry["repository"] == AOI
+    assert entry["source"] == "vendor/uv_tool_build.py"
+    assert entry["ref"] == entry["commit"]
+    assert re.fullmatch(r"[0-9a-f]{40}", entry["commit"])
+    # The launcher and license stay on their own Aoi pin; the builder is a later first-parent commit.
+    assert entry["commit"] != next(f["commit"] for f in lock["files"] if f["destination"] == "vendor/py_launch.cjs")
+    data = (ROOT / "vendor" / "uv_tool_build.py").read_bytes()
+    assert hashlib.sha256(data).hexdigest() == entry["sha256"]
+    blob = hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+    assert blob == entry["blob_sha"]
 
 
 def test_no_per_tool_wrapper_and_readme_documents_the_direct_command():

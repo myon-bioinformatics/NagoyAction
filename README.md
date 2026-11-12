@@ -48,9 +48,9 @@ A repository split out from the [Aoi](https://github.com/myon-bioinformatics/Aoi
 
 ### Local forge (migration in progress)
 
-`local_forge.py` provides the local Gitea/Forgejo management functions extracted from OneLinearNumerousMemo. It uses the existing `OLNM_HOME` and `DIAL_FILE` locations so that a local forge can be found during migration. This is a standalone standard-library command; it does not implement GitHub Actions runners.
+`local_forge.py` provides the local Gitea/Forgejo management functions extracted from OneLinearNumerousMemo. It uses the existing `OLNM_HOME` and `DIAL_FILE` locations so that a local forge can be found during migration. It is a standard-library module invoked as `nagoyaction hub …`; it does not implement GitHub Actions runners.
 
-Prepare an isolated uv tool project with `python tools/build_uv_tool.py build/nagoyaction-tool`, then install it with `uv tool install ./build/nagoyaction-tool`. This installs the `nagoyaction` and `local-forge` commands; the two Python files are independent modules and have no third-party runtime dependencies. Pipeline definitions and project-specific inputs remain separate files.
+Prepare an isolated uv tool project with `python vendor/uv_tool_build.py nagoyaction.py --module local_forge.py --module localci.py --out build/nagoyaction-tool`, then install it with `uv tool install ./build/nagoyaction-tool`. This installs the `nagoyaction` command only (`nagoyaction hub …` covers local forge operations; there is no `local-forge` command). The bundled modules have no third-party runtime dependencies. Pipeline definitions and project-specific inputs remain separate files. The builder itself is the vendored shared copy from Aoi (`vendor/uv_tool_build.py`).
 
 ```bash
 nagoyaction hub --help          # or: python nagoyaction.py hub --help
@@ -59,7 +59,7 @@ nagoyaction hub dial mirror     # 🎛️  → 🔁 mirror (2)
 nagoyaction hub repo ls
 ```
 
-`nagoyaction hub …` passes every argument to `local_forge.py`; `local-forge …` and `python local_forge.py …` are the same command, and OneLinearNumerousMemo's `olnm hub …` forwards here. From Python, `nagoyaction.hub("dial", "local")` does the same and returns the exit code. `local_forge.py` is imported only for `hub`, so pipeline commands never load it.
+`nagoyaction hub …` passes every argument to `local_forge.py` (replacing the former `local-forge …` command). `python local_forge.py …` still runs the same module directly, and OneLinearNumerousMemo's `olnm hub …` forwards here. From Python, `nagoyaction.hub("dial", "local")` does the same and returns the exit code. `local_forge.py` is imported only for `hub`, so pipeline commands never load it.
 
 The dial takes a name: `offline` (no network), `local` (local forge only), `mirror` (local forge that mirrors GitHub) or `github` (GitHub directly). Output shows the name first and the stored digit after it, for example `🔁 mirror (2)`. The dial file keeps the digit 0–3, so older readers of `DIAL_FILE` keep working, and `dial 2` is still accepted. A mistyped name is rejected with a suggestion (`maybe you meant 'mirror'?` on Python 3.14+) and leaves the dial unchanged.
 
@@ -245,7 +245,7 @@ python nagoyaction/nagoyaction.py run    cycles/c001-chunichi/pipeline.toml --dr
 ## Node entry (Node 26+)
 
 `node vendor/py_launch.cjs --env-var NAGOYACTION_PYTHON -- nagoyaction.py <args>` runs `nagoyaction.py`
-through the vendored shared launcher `vendor/py_launch.cjs` (there is no per-tool `.cjs` wrapper), taken byte-identical from Aoi's `vendor/py_launch.cjs` (parent → Aoi → NagoyAction; no generation is skipped) together with Aoi's `LICENSE` as `vendor/aoi-LICENSE`, both pinned to one Aoi main merge commit in `vendor.lock.json`. Arguments, stdin/stdout/stderr and the
+through the vendored shared launcher `vendor/py_launch.cjs` (there is no per-tool `.cjs` wrapper), taken byte-identical from Aoi's `vendor/py_launch.cjs` (parent → Aoi → NagoyAction; no generation is skipped) together with Aoi's `LICENSE` as `vendor/aoi-LICENSE`, both pinned to one Aoi main merge commit in `vendor.lock.json`. The shared uv tool builder `vendor/uv_tool_build.py` is taken the same way from Aoi and pinned separately in that lock. Arguments, stdin/stdout/stderr and the
 exit code are passed through unchanged; Python runs with `-S`, including interpreter discovery.
 `NAGOYACTION_PYTHON` picks the interpreter (via `--env-var`). The launcher forwards repeated SIGINT/SIGTERM
 until the Python child exits. Launcher failures (no Python 3.9+, spawn error, signal) exit 2, as does a Node older than 26;
@@ -254,7 +254,10 @@ the tool's `--json` flag).
 
 The launcher and license are pinned to Aoi's accepting main merge commit
 [`827387a`](https://github.com/myon-bioinformatics/Aoi/commit/9e0147a17695ce63fa73daf75d8195a4f49095bb),
-not to the root repository or an unmerged PR head. `shared-tools.lock.json` remains the separate
+not to the root repository or an unmerged PR head. The builder is pinned to Aoi's later main
+first-parent commit
+[`3d8dcc70`](https://github.com/myon-bioinformatics/Aoi/commit/3d8dcc70a9c4e6c4f4b7de05868f54acd3901ce7)
+(#181, which vendors parent #251 including `--module`). `shared-tools.lock.json` remains the separate
 lock for the polars shrink tools under `vendor/aoi/`.
 
 The launcher's CLI is `node vendor/py_launch.cjs [--env-var NAME] [--site] [--] SCRIPT.py [ARGS...]`.
