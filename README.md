@@ -1,5 +1,7 @@
 # NagoyAction
 
+📘 [利用ガイド / Usage guide](https://myon-bioinformatics.github.io/NagoyAction/) (GitHub Pages)
+
 <p align="center">
   <img src="docs/brand/icon.png" alt="NagoyAction icon" width="160" />
 </p>
