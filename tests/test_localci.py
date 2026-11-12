@@ -1152,3 +1152,100 @@ def test_nagoyaction_actionlint_routes_to_lint_and_all_to_run(monkeypatch, capsy
         nagoyaction.main(["actionlint", "--help"])
     assert exc.value.code == 0
     assert "usage: nagoyaction actionlint" in capsys.readouterr().out
+
+
+# ── best effort（nagoyaction actionlint）: 取得できない・届かない環境では fail でなく skip ──
+ACTIONLINT_API = "https://api.github.com/repos/rhysd/actionlint/releases/latest"
+
+
+def _cached_actionlint(cache, version):
+    home = cache / "actionlint" / version
+    home.mkdir(parents=True)
+    binary = home / "actionlint"
+    binary.write_text("#!/bin/sh\n")
+    binary.chmod(0o755)
+    (home / "actionlint.record.json").write_text(json.dumps({"tag": "v" + version, "asset": "a.tar.gz", "sha256": "ab" * 32}))
+    return binary
+
+
+def _unreachable(url):
+    return urllib.error.URLError(f"no route to {url}")
+
+
+def test_local_actionlint_prefers_newest_verified_cache_then_path_then_none(tmp_path):
+    which = {"actionlint": "/opt/bin/actionlint"}.get
+    assert localci.local_actionlint(tmp_path, "why", which=which).via == "path"
+    assert localci.local_actionlint(tmp_path, "why", which=lambda name: None) == localci.ActionlintRecord("", "", "", None, "none", "why")
+    _cached_actionlint(tmp_path, "1.7.9")
+    newest = _cached_actionlint(tmp_path, "1.7.10")  # 10 > 9: 文字列順ではない
+    (tmp_path / "actionlint" / "1.8.0").mkdir()  # 記録の無い版は使わない
+    record = localci.local_actionlint(tmp_path, "why", which=which)
+    assert (record.via, record.tag, record.binary, record.note) == ("cache", "v1.7.10", newest, "why")
+
+
+def test_best_effort_unreachable_skips_and_asks_github_only_once(tmp_path, monkeypatch):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setattr(localci.shutil, "which", lambda name: None)
+    opener = Opener({ACTIONLINT_API: _unreachable(ACTIONLINT_API)})
+    session = localci.Session(tmp_path, opener=opener, runner=lambda *a, **k: pytest.fail("nothing to run"), best_effort=True)
+    lint = session.execute(localci.Check("a", "actionlint", "ci.yml", file="ci.yml"))
+    assert lint.status == "skip" and "no route" in lint.detail
+    sha_pin = session.execute(localci.Check("p", "pin", "x/y", file="ci.yml", ref="a" * 40, repo="x/y"))
+    tag_pin = session.execute(localci.Check("q", "pin", "x/z", file="ci.yml", ref="v1", repo="x/z"))
+    assert sha_pin.status == tag_pin.status == "skip"
+    assert "SHA ピン。" in sha_pin.detail and "SHA ピンではない" in tag_pin.detail
+    assert opener.urls == [ACTIONLINT_API]  # 届かないと分かったら、残りは問い合わせない（タイムアウト待ちを重ねない）
+
+
+def test_best_effort_http_error_skips_that_repo_only(tmp_path, monkeypatch):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    blocked = "https://api.github.com/repos/x/y/releases/latest"
+    missing = "https://api.github.com/repos/x/z/releases/latest"
+    opener = Opener({blocked: http_error(blocked, 403), missing: http_error(missing, 404)})
+    session = localci.Session(tmp_path, opener=opener, runner=lambda *a, **k: pytest.fail("no git"), best_effort=True, actionlint=None)
+    first = session.execute(localci.Check("p", "pin", "x/y", file="ci.yml", ref="a" * 40, repo="x/y"))
+    again = session.execute(localci.Check("p2", "pin", "x/y", file="ci.yml", ref="a" * 40, repo="x/y"))
+    other = session.execute(localci.Check("q", "pin", "x/z", file="ci.yml", ref="a" * 40, repo="x/z"))
+    assert first.status == again.status == "skip" and "403" in first.detail
+    assert other.status == "pass" and not session.offline  # 応答はあるので、ほかの repo は聞く
+    assert opener.urls.count(blocked) == 1
+
+
+def test_best_effort_uses_cached_actionlint_when_latest_is_unknown(tmp_path, monkeypatch):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    binary = _cached_actionlint(tmp_path / ".localci", "1.7.7")
+    calls = []
+
+    def runner(argv, **kwargs):
+        calls.append(argv)
+        return Proc()
+
+    session = localci.Session(tmp_path, opener=Opener({ACTIONLINT_API: http_error(ACTIONLINT_API, 403)}), runner=runner, best_effort=True)
+    assert session.execute(localci.Check("a", "actionlint", "ci.yml", file="ci.yml")).status == "pass"
+    assert calls[0][0] == str(binary)
+    assert "取得済みの v1.7.7 を使う" in localci.format_best_effort_line(session.actionlint_record)
+
+
+@pytest.mark.parametrize("best_effort, in_actions", [(False, False), (True, True)])
+def test_strict_and_github_actions_still_fail_closed(tmp_path, monkeypatch, best_effort, in_actions):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true" if in_actions else "")
+    _cached_actionlint(tmp_path / ".localci", "1.7.7")
+    session = localci.Session(tmp_path, opener=Opener({ACTIONLINT_API: _unreachable(ACTIONLINT_API)}), best_effort=best_effort)
+    with pytest.raises(localci.LocalCIError):
+        session.prepare_actionlint()
+
+
+def test_lint_exit_code_is_zero_with_skips_and_one_under_strict(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setattr(localci.shutil, "which", lambda name: None)
+    monkeypatch.setattr(localci.urllib.request, "urlopen", lambda req, timeout=60: (_ for _ in ()).throw(_unreachable(req.full_url)))
+    workflows = tmp_path / "repo" / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text("on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n")
+    monkeypatch.chdir(tmp_path / "repo")
+    assert localci.main(["lint", "--seed", "1"]) == 0
+    out = capsys.readouterr().out
+    assert "[pass] round 1/1（2/2 件は skip）" in out
+    assert "⚠️ best effort: 2 件は検査できず [skip]。何も確かめていない。失敗にするなら --strict" in out
+    assert localci.main(["lint", "--seed", "1", "--strict"]) == 1
