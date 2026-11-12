@@ -44,6 +44,29 @@ A repository split out from the [Aoi](https://github.com/myon-bioinformatics/Aoi
 
 ## Installation and usage
 
+### Local forge (migration in progress)
+
+`local_forge.py` provides the local Gitea/Forgejo management functions extracted from OneLinearNumerousMemo. It uses the existing `OLNM_HOME` and `DIAL_FILE` locations so that a local forge can be found during migration. This is a standalone standard-library command; it does not implement GitHub Actions runners.
+
+Prepare an isolated uv tool project with `python tools/build_uv_tool.py build/nagoyaction-tool`, then install it with `uv tool install ./build/nagoyaction-tool`. This installs the `nagoyaction` and `local-forge` commands; the two Python files are independent modules and have no third-party runtime dependencies. Pipeline definitions and project-specific inputs remain separate files.
+
+```bash
+nagoyaction hub --help          # or: python nagoyaction.py hub --help
+nagoyaction hub status
+nagoyaction hub dial mirror     # 🎛️  → 🔁 mirror (2)
+nagoyaction hub repo ls
+```
+
+`nagoyaction hub …` passes every argument to `local_forge.py`; `local-forge …` and `python local_forge.py …` are the same command, and OneLinearNumerousMemo's `olnm hub …` forwards here. From Python, `nagoyaction.hub("dial", "local")` does the same and returns the exit code. `local_forge.py` is imported only for `hub`, so pipeline commands never load it.
+
+The dial takes a name: `offline` (no network), `local` (local forge only), `mirror` (local forge that mirrors GitHub) or `github` (GitHub directly). Output shows the name first and the stored digit after it, for example `🔁 mirror (2)`. The dial file keeps the digit 0–3, so older readers of `DIAL_FILE` keep working, and `dial 2` is still accepted. A mistyped name is rejected with a suggestion (`maybe you meant 'mirror'?` on Python 3.14+) and leaves the dial unchanged.
+
+OneLinearNumerousMemo forwards `olnm hub …` and `olnm dial …` here once its handover change is merged. The BlueProbe/QueRyu launchers are not yet migrated. Do not run both managers concurrently against the same forge.
+
+A newly started forge must pass its health check before startup reports success. Failed startup stops only the child created by that invocation; if cleanup fails, its PID is retained for inspection. A dial change saves its new value only after applying the forge and repository changes. This is not a transaction: earlier process, remote, repository, or mirror changes are not automatically rolled back if a later operation fails. Inspect the forge and repository remotes before retrying; the retained previous dial does not prove every side effect was reverted.
+
+CI's `real-local-forge` job downloads and checksum-verifies Gitea 1.27.3, starts it on localhost in temporary state, and exercises repository creation, push, issue, and pull request operations. The test has no dependency on a real GitHub account or a persistent user configuration. Forgejo remains covered by the fake-server tests only.
+
 No installation needed. It runs on the Python 3.11+ standard library alone.
 
 ```bash
@@ -82,6 +105,19 @@ To bring in shared modules from other repositories, use that repository's `vendo
 
 Checks workflows and tests locally without waiting for GitHub Actions to finish.
 
+`nagoyaction actionlint` runs only actionlint and the `uses:` pin checks on the current directory's `.github/workflows` (`--root` to choose another): no SHA resolution, no pytest, no Aoi checkout. It reports every failure in one pass, and `--strict` makes stale SHA pins fail. The actionlint binary and its record stay in `~/.cache/nagoyaction/localci`, so linting another repository writes nothing into it.
+
+actionlint itself is a Go program, but Go is not needed: localci downloads the prebuilt release binary and verifies its checksum. Where that is not possible (a closed network, a blocked or rate-limited GitHub API), `nagoyaction actionlint` works best effort instead of stopping:
+
+| What it can reach | actionlint | `uses:` pins |
+|---|---|---|
+| GitHub | latest release, verified (`go run` at that tag if only the download fails and Go exists) | compared with the latest release |
+| no GitHub, an earlier run's download in `~/.cache/nagoyaction/localci` | that cached, verified version | `[skip]`: SHA pin or not is shown, staleness is not compared |
+| no GitHub, `actionlint` on PATH (carried in) | that binary | `[skip]` as above |
+| none of these | `[skip]`: not linted | `[skip]` as above |
+
+A `[skip]` is not a failure: the exit code stays 0 and the summary ends with `⚠️ best effort: N 件は検査できず [skip]` (plus `何も確かめていない` when nothing could be checked). Real findings still fail with exit code 1. Once GitHub does not answer, the remaining checks do not ask again, so the run does not wait for one timeout per action. `--strict` turns best effort off: anything that cannot be checked fails, as does a stale pin. Inside GitHub Actions best effort is always off. `python localci.py run` (and `--all`) is unchanged and still requires GitHub. `nagoyaction actionlint --all …` is `python localci.py run …` (options included). From Python, `nagoyaction.actionlint("--strict")` returns the exit code. `python localci.py lint` is the same check without nagoyaction.
+
 `python localci.py run` checks `.github/workflows` with actionlint. If shellcheck is on PATH, actionlint also uses it for `run:` blocks. actionlint resolves the latest rhysd/actionlint release on every run and verifies the published checksums and GitHub's digest. The version is not pinned in source. The resolved tag, asset name, and verified sha256 are left in the output and `.localci/refs.env`, and written next to the resolved referenced SHAs if `GITHUB_STEP_SUMMARY` exists. On GitHub Actions it stops if fetching or verification fails and does not fall back to Go. Locally, only when the tag could be resolved, it falls back to `go run github.com/rhysd/actionlint/cmd/actionlint@<tag>`. At the same time it resolves the main SHA of referenced repositories with `git ls-remote` plus a GitHub API repository id check, and writes them to `.localci/refs.env`. Whether `uses:` pins match the commit of each action's latest release tag is only reported by default. Setup actions (`actions/setup-python`, `actions/setup-node`, `astral-sh/setup-uv`) use the release's 40-character SHA and `# vX.Y.Z`. Other `actions/*` use the moving major tag `vN`.
 
 ```bash
@@ -92,6 +128,8 @@ python localci.py run --repeat 10 --keep-going
 python localci.py run --self-tests            # only tests/test_localci.py (no Aoi)
 python localci.py run --strict                # fail on stale SHA pins; vN for non-setup actions/* is allowed
 python localci.py resolve                     # only resolve SHAs; CI's resolve job uses this too
+nagoyaction actionlint                        # actionlint + uses: pins only (= python localci.py lint)
+nagoyaction actionlint --strict --all --repeat 10   # = python localci.py run --strict --repeat 10
 ```
 
 `--repeat N` does not trace the same checks N times. It shuffles the check list (resolving references, actionlint, each `uses:`, the pytest tests) by seed and splits it into N nearly equal shards. Each round runs only one shard, and once all rounds finish every check has run exactly once. It stops at a failing round and prints the round number, shard contents, and seed. `--keep-going` continues. After each round it prints the number of rounds passed and completed against N. Getting deep without failures is a confidence signal that the remaining shards will pass too.

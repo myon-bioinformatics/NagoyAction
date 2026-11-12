@@ -356,6 +356,8 @@ def _parser() -> JsonArgumentParser:
     _add_json_flag(r, "人間向けの行を出さず、stdout に schema nagoyaction-run/1 を書く。"
                       " doctor が止めたときは、その代わりに nagoyaction-doctor/1 を1つだけ書く。"
                       " 手順が失敗したときは、その終了コードと stderr の nagoyaction-error/1（error.code=step）。")
+    for name, help_text in DELEGATES_HELP.items():  # main() hands these to their module before this parser runs
+        sub.add_parser(name, help=help_text, add_help=False).add_argument("rest", nargs=argparse.REMAINDER)
     for each in (ap, *sub.choices.values()):
         each.suggest_on_error = True  # 🤔 argparse 3.14+: "maybe you meant" for subcommands; older Pythons ignore it
     return ap
@@ -372,13 +374,41 @@ def _report(json_mode: bool, exit_code: int, code: str, message: str, *, human: 
         print(human, file=sys.stderr)
 
 
+def actionlint(*argv: str) -> int:
+    """actionlint + `uses:` pin checks of .github/workflows; --all = the whole localci run (SHA resolution, pytest in Aoi).
+    Same as `nagoyaction actionlint ...`: actionlint("--strict"), actionlint("--all", "--repeat", "10")."""
+    import localci  # only when asked, so pipeline commands never load it
+    rest = list(argv)
+    if "--all" in rest:
+        rest.remove("--all")
+        return localci.main(["run", *rest], prog="nagoyaction actionlint")
+    return localci.main(["lint", *rest], prog="nagoyaction actionlint")
+
+
+def hub(*argv: str) -> int:
+    """Local forge (Gitea / Forgejo): hub("status"), hub("dial", "mirror"). Same as `nagoyaction hub ...` and `olnm hub ...`."""
+    import local_forge  # only when asked, so pipeline commands never load it
+    return local_forge.main(list(argv), prog="nagoyaction hub")
+
+
+DELEGATES = {"actionlint": actionlint, "hub": hub}
+DELEGATES_HELP = {
+    "actionlint": "🔍 actionlint と uses: のピン検査（--strict / --all で localci run 全体）。残りの引数を localci に渡す",
+    "hub": "🏠 ローカル GitHub（Gitea / Forgejo）の操作。残りの引数を local_forge に渡す（例: hub status / hub dial mirror）",
+}
+
+
 def main(argv=None) -> int:
     if argv is None:
         argv = sys.argv[1:]
     argv = list(argv)
+    if argv[:1] and argv[0] in DELEGATES:  # hand everything (incl. --help) to the module before this parser sees it
+        return DELEGATES[argv[0]](*argv[1:])
     ap = _parser()
     _arm_json(ap, "--json" in argv)
     args = ap.parse_args(argv)
+    if args.cmd in DELEGATES:  # e.g. `--json hub status`
+        return DELEGATES[args.cmd](*args.rest)
     json_mode = _json_mode(args, argv)
 
     try:
