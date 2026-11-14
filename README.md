@@ -84,6 +84,8 @@ python nagoyaction.py run    <pipeline.toml> --dry-run  # only show what would b
 
 A pipeline TOML has `name`, `root`, `[requires]` (Python version, tools), and `[[step]]` (`name`, argument array `run`, `network`, `outputs`). Examples are `pipelines/research.toml` and `pipelines/inbox.toml`.
 
+Steps inherit the runner's environment. NagoyAction never puts other projects on the import path itself: inside Aoi, start it with `python aoi.py nagoyaction run <pipeline.toml>` so that steps such as `queryu/queryu.py` and `inbox/inbox.py` find QueRyu, BlueProbe, SakAnalytics and Aoi's `aoi_npb` by name (`aoi.py` passes Aoi's pytest `pythonpath`). The same goes for `python aoi.py nagoyaction/annual_history_report.py …`.
+
 GitHub Actions workflows only call this command (e.g. `.github/workflows/cycle-c001.yml`).
 Org-wide reusable workflows (actionlint, etc.) come from `myon-bioinformatics/myon-bioinformatics`.
 To bring in shared modules from other repositories, use that repository's `vendor_sync.py` (SHA-pinned).
