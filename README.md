@@ -103,7 +103,8 @@ To bring in shared modules from other repositories, use that repository's `vendo
 | `pipelines/` | Pipeline definitions (`research.toml`, `inbox.toml`) | as is |
 | `inbox/inbox.py`, `docs/inbox.md` | Question intake | as is |
 | `containers/` | Local LLM container (not connected. "Local LLM container" below) | as is |
-| `tests/` | pytest (run inside Aoi. "Tests" below) | as is |
+| `scripts/` | CI and measurement helpers (`check_vendor_aoi.py`, `collect_with_polars_min.py`, `real_forge_smoke.py`, `benchmark_link_case_index.py`) | as is |
+| `tests/` | pytest, one file per module (run inside Aoi. "Tests" below); stand-ins such as `fake_forgejo.py` in `tests/fixtures/` | as is |
 
 ➡️ The modules marked `core/` / `npb/` move when NagoyAction is next synced into Aoi, together with Aoi's side: the tests run inside Aoi's tree with Aoi's pytest `pythonpath` (`nagoyaction` only), and Aoi calls them by path (`links.yml` → `nagoyaction.py linkcheck`, `ci.yml` and `cycles/c001-chunichi/pipeline.toml` → `research_digest.py`, `c001-replay-audit.yml` → `ghi_execution.py`, `scripts/c001_publication_policy.py` → `publication_gate`, DRAgoWing's `tests/test_export.py` → `localci`). Aoi's `pythonpath` then gains `nagoyaction/core` and `nagoyaction/npb`, and `nagoyaction.py` adds its own `core/` for `actionlint` / `hub`.
 
