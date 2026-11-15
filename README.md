@@ -50,7 +50,9 @@ A repository split out from the [Aoi](https://github.com/myon-bioinformatics/Aoi
 
 `local_forge.py` provides the local Gitea/Forgejo management functions extracted from OneLinearNumerousMemo. It uses the existing `OLNM_HOME` and `DIAL_FILE` locations so that a local forge can be found during migration. It is a standard-library module invoked as `nagoyaction hub …`; it does not implement GitHub Actions runners.
 
-Prepare an isolated uv tool project with `python vendor/uv_tool_build.py nagoyaction.py --module local_forge.py --module localci.py --out build/nagoyaction-tool`, then install it with `uv tool install ./build/nagoyaction-tool`. This installs the `nagoyaction` command only (`nagoyaction hub …` covers local forge operations; there is no `local-forge` command). The bundled modules have no third-party runtime dependencies. Pipeline definitions and project-specific inputs remain separate files. The builder itself is the vendored shared copy from Aoi (`vendor/uv_tool_build.py`).
+Install directly from a checkout with `uv tool install .`, or from GitHub with `uv tool install git+https://github.com/myon-bioinformatics/NagoyAction.git`. The root `pyproject.toml` packages `nagoyaction`, `local_forge` and `localci` with no third-party runtime dependencies. The optional locked self-test environment remains under `tools/localci-env`; the complete suite still runs inside Aoi.
+
+Alternatively, prepare an isolated uv tool project with `python vendor/uv_tool_build.py nagoyaction.py --module local_forge.py --module localci.py --out build/nagoyaction-tool`, then install it with `uv tool install ./build/nagoyaction-tool`. This installs the `nagoyaction` command only (`nagoyaction hub …` covers local forge operations; there is no `local-forge` command). The bundled modules have no third-party runtime dependencies. Pipeline definitions and project-specific inputs remain separate files. The builder itself is the vendored shared copy from Aoi (`vendor/uv_tool_build.py`).
 
 ```bash
 nagoyaction hub --help          # or: python nagoyaction.py hub --help
@@ -192,7 +194,7 @@ Tests are in `tests/test_llama_container.py` (no network).
 
 For the independent `localci.py` self-tests only, an [optional locked pytest-only environment](docs/nano-localci-tests.md) avoids installing Aoi research dependencies. It does not replace the complete Aoi-integrated suite below.
 
-Steps and tests use Aoi's top level (`cycles/`, `queryu/`, `sakanalytics/`, `blueprobe/`, `vendor/`, `scripts/`, `docs/`) by relative path. They are not tested standalone. On every run CI resolves main's SHA with `git ls-remote https://github.com/myon-bioinformatics/Aoi refs/heads/main`, checks it out, replaces its `nagoyaction/` with this repository's tree, and runs `nagoyaction/tests` with Aoi's settings. The resolved SHA is left in the job summary. A ref can be given via `aoi_ref` in `workflow_dispatch`. With the same SHA, the bytes of `vendor/aoi/` are checked against Aoi's originals. A mismatch is a warning on pull requests and a failure on push to main and on schedule.
+Steps and tests use Aoi's top level (`cycles/`, `queryu/`, `sakanalytics/`, `blueprobe/`, `vendor/`, `scripts/`, `docs/`) by relative path. They are not tested standalone. On every run CI resolves main's SHA with `git ls-remote https://github.com/myon-bioinformatics/Aoi refs/heads/main`, checks it out, replaces its `nagoyaction/` with this repository's tree, and runs `nagoyaction/tests` with Aoi's settings. The resolved SHA is left in the job summary. With the same SHA, the bytes of `vendor/aoi/` are checked against Aoi's originals. A mismatch is a warning on pull requests and a failure on push to main and on schedule.
 
 ```sh
 git clone https://github.com/myon-bioinformatics/Aoi.git ../Aoi
