@@ -252,7 +252,7 @@ python nagoyaction/nagoyaction.py run    cycles/c001-chunichi/pipeline.toml --dr
 ## Node entry (Node 26+)
 
 `node vendor/py_launch.cjs --env-var NAGOYACTION_PYTHON -- nagoyaction.py <args>` runs `nagoyaction.py`
-through the vendored shared launcher `vendor/py_launch.cjs` (there is no per-tool `.cjs` wrapper), taken byte-identical from Aoi's `vendor/py_launch.cjs` (parent → Aoi → NagoyAction; no generation is skipped) together with Aoi's `LICENSE` as `vendor/aoi-LICENSE`, both pinned to one Aoi main merge commit in `vendor.lock.json`. The shared uv tool builder `vendor/uv_tool_build.py` is taken the same way from Aoi and pinned separately in that lock. Arguments, stdin/stdout/stderr and the
+through the vendored shared launcher `vendor/py_launch.cjs` (there is no per-tool `.cjs` wrapper), taken byte-identical from Aoi's `vendor/py_launch.cjs` (parent → Aoi → NagoyAction; no generation is skipped) together with Aoi's `LICENSE` as `vendor/aoi-LICENSE`, both pinned to one Aoi main merge commit in `vendor.lock.json`. The shared uv tool builder `vendor/uv_tool_build.py` is taken the same way from Aoi and pinned separately in that lock. The parent's shared contract checks `vendor/fleet_check.py` (called by `tests/test_fleet.py`) come straight from `myon-bioinformatics/myon-bioinformatics` and are pinned in the same lock. Arguments, stdin/stdout/stderr and the
 exit code are passed through unchanged; Python runs with `-S`, including interpreter discovery.
 `NAGOYACTION_PYTHON` picks the interpreter (via `--env-var`). The launcher forwards repeated SIGINT/SIGTERM
 until the Python child exits. Launcher failures (no Python 3.9+, spawn error, signal) exit 2, as does a Node older than 26;
