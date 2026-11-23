@@ -1,4 +1,4 @@
-import json, subprocess, sys
+import importlib.util, json, subprocess, sys
 from pathlib import Path
 
 import pytest
@@ -213,10 +213,17 @@ def test_cli_is_stdlib_only_and_runs_from_another_directory(tmp_path):
 NAGOYA = Path(__file__).resolve().parents[1] / "nagoyaction.py"
 
 
+_cli_args_spec = importlib.util.spec_from_file_location(
+    "nagoyaction_cli_args", Path(__file__).resolve().parents[1] / "vendor" / "cli_args.py",
+)
+_cli_args = importlib.util.module_from_spec(_cli_args_spec)
+sys.modules[_cli_args_spec.name] = _cli_args
+_cli_args_spec.loader.exec_module(_cli_args)
+
+
 def run_nagoyaction(args, *, cwd=None):
-    return subprocess.run(
-        [sys.executable, "-S", str(NAGOYA), *args],
-        cwd=cwd, capture_output=True, text=True,
+    return _cli_args.run_cli(
+        NAGOYA, *args, python_options=("-S",), cwd=cwd,
     )
 
 
